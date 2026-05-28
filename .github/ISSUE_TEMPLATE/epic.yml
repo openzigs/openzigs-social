@@ -1,0 +1,53 @@
+name: Epic
+description: A large unit of work tracked as an epic with sub-issues
+title: "[EPIC] "
+labels: [epic]
+body:
+  - type: textarea
+    id: overview
+    attributes:
+      label: Overview
+      description: One- or two-paragraph description of what this epic delivers and why.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        ### In scope
+        - ...
+
+        ### Out of scope
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagram
+    attributes:
+      label: Architecture / flow diagram
+      description: Mermaid block (component, sequence, ER, or flow).
+      render: markdown
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Given ... When ... Then ...
+    validations:
+      required: true
+  - type: textarea
+    id: subissues
+    attributes:
+      label: Sub-issues
+      placeholder: |
+        - [ ] #...
+    validations:
+      required: true
+  - type: input
+    id: points
+    attributes:
+      label: Story-point estimate
+      placeholder: "13"
+    validations:
+      required: true

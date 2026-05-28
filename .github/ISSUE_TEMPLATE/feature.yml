@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a new capability for openzigs-social
+title: "[FEATURE] "
+labels: [feature]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - platform
+        - ui
+        - inbox
+        - outbox
+        - scheduler
+        - analytics
+        - crm
+        - brand-voice
+        - telegram
+        - llm
+        - vault
+        - setup
+        - packaging
+        - docs
+    validations:
+      required: true
