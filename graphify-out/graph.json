@@ -1,0 +1,154 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "vitest.config.ts",
+      "file_type": "code",
+      "source_file": "vitest.config.ts",
+      "source_location": "L1",
+      "id": "vitest_config_ts",
+      "community": 3,
+      "norm_label": "vitest.config.ts"
+    },
+    {
+      "label": "eslint.config.mjs",
+      "file_type": "code",
+      "source_file": "eslint.config.mjs",
+      "source_location": "L1",
+      "id": "eslint_config_mjs",
+      "community": 4,
+      "norm_label": "eslint.config.mjs"
+    },
+    {
+      "label": "server.ts",
+      "file_type": "code",
+      "source_file": "src/server.ts",
+      "source_location": "L1",
+      "id": "src_server_ts",
+      "community": 0,
+      "norm_label": "server.ts"
+    },
+    {
+      "label": "bootstrap()",
+      "file_type": "code",
+      "source_file": "src/server.ts",
+      "source_location": "L8",
+      "id": "src_server_bootstrap",
+      "community": 0,
+      "norm_label": "bootstrap()"
+    },
+    {
+      "label": "smoke.test.ts",
+      "file_type": "code",
+      "source_file": "src/smoke.test.ts",
+      "source_location": "L1",
+      "id": "src_smoke_test_ts",
+      "community": 5,
+      "norm_label": "smoke.test.ts"
+    },
+    {
+      "label": "next-env.d.ts",
+      "file_type": "code",
+      "source_file": "ui/next-env.d.ts",
+      "source_location": "L1",
+      "id": "ui_next_env_d_ts",
+      "community": 6,
+      "norm_label": "next-env.d.ts"
+    },
+    {
+      "label": "postcss.config.mjs",
+      "file_type": "code",
+      "source_file": "ui/postcss.config.mjs",
+      "source_location": "L1",
+      "id": "ui_postcss_config_mjs",
+      "community": 7,
+      "norm_label": "postcss.config.mjs"
+    },
+    {
+      "label": "next.config.mjs",
+      "file_type": "code",
+      "source_file": "ui/next.config.mjs",
+      "source_location": "L1",
+      "id": "ui_next_config_mjs",
+      "community": 8,
+      "norm_label": "next.config.mjs"
+    },
+    {
+      "label": "page.tsx",
+      "file_type": "code",
+      "source_file": "ui/app/page.tsx",
+      "source_location": "L1",
+      "id": "ui_app_page_tsx",
+      "community": 1,
+      "norm_label": "page.tsx"
+    },
+    {
+      "label": "HomePage()",
+      "file_type": "code",
+      "source_file": "ui/app/page.tsx",
+      "source_location": "L1",
+      "id": "app_page_homepage",
+      "community": 1,
+      "norm_label": "homepage()"
+    },
+    {
+      "label": "layout.tsx",
+      "file_type": "code",
+      "source_file": "ui/app/layout.tsx",
+      "source_location": "L1",
+      "id": "ui_app_layout_tsx",
+      "community": 2,
+      "norm_label": "layout.tsx"
+    },
+    {
+      "label": "RootLayout()",
+      "file_type": "code",
+      "source_file": "ui/app/layout.tsx",
+      "source_location": "L10",
+      "id": "app_layout_rootlayout",
+      "community": 2,
+      "norm_label": "rootlayout()"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/server.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_src": "src_server_ts",
+      "_tgt": "src_server_bootstrap",
+      "source": "src_server_ts",
+      "target": "src_server_bootstrap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ui/app/page.tsx",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "ui_app_page_tsx",
+      "_tgt": "app_page_homepage",
+      "source": "ui_app_page_tsx",
+      "target": "app_page_homepage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "ui/app/layout.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_src": "ui_app_layout_tsx",
+      "_tgt": "app_layout_rootlayout",
+      "source": "ui_app_layout_tsx",
+      "target": "app_layout_rootlayout",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}
