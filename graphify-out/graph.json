@@ -1338,8 +1338,8 @@
       "source_file": "src/vault/vault.ts",
       "source_location": "L52",
       "weight": 1.0,
-      "_src": "vault_vault_credentialvault_constructor",
-      "_tgt": "vault_crypto_derivekey",
+      "_src": "vault_crypto_derivekey",
+      "_tgt": "vault_vault_credentialvault_constructor",
       "source": "vault_crypto_derivekey",
       "target": "vault_vault_credentialvault_constructor"
     },
@@ -1350,8 +1350,8 @@
       "source_file": "src/vault/vault.ts",
       "source_location": "L79",
       "weight": 1.0,
-      "_src": "vault_vault_credentialvault_persist",
-      "_tgt": "vault_crypto_encrypt",
+      "_src": "vault_crypto_encrypt",
+      "_tgt": "vault_vault_credentialvault_persist",
       "source": "vault_crypto_encrypt",
       "target": "vault_vault_credentialvault_persist"
     },
@@ -1362,8 +1362,8 @@
       "source_file": "src/vault/vault.ts",
       "source_location": "L68",
       "weight": 1.0,
-      "_src": "vault_vault_credentialvault_load",
-      "_tgt": "vault_crypto_decrypt",
+      "_src": "vault_crypto_decrypt",
+      "_tgt": "vault_vault_credentialvault_load",
       "source": "vault_crypto_decrypt",
       "target": "vault_vault_credentialvault_load"
     },
@@ -2250,8 +2250,8 @@
       "source_file": "src/copilot/smart-router.ts",
       "source_location": "L59",
       "weight": 1.0,
-      "_src": "copilot_smart_router_smartrouter_route",
-      "_tgt": "copilot_privacy_privacycontroller_forceslocal",
+      "_src": "copilot_privacy_privacycontroller_forceslocal",
+      "_tgt": "copilot_smart_router_smartrouter_route",
       "source": "copilot_privacy_privacycontroller_forceslocal",
       "target": "copilot_smart_router_smartrouter_route"
     },
