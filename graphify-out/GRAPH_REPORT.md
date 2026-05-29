@@ -1,11 +1,11 @@
 # Graph Report - openzigs-social  (2026-05-29)
 
 ## Corpus Check
-- 38 files · ~11,187 words
+- 38 files · ~11,484 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 114 nodes · 144 edges · 7 communities detected
+- 114 nodes · 145 edges · 7 communities detected
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 6 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -48,7 +48,7 @@ Cohesion: 0.2
 Nodes (2): RefreshRegistry, TokenRefreshScheduler
 
 ### Community 4 - "Community 4"
-Cohesion: 0.33
+Cohesion: 0.35
 Nodes (1): CredentialVault
 
 ### Community 5 - "Community 5"
