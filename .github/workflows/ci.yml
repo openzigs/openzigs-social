@@ -16,7 +16,7 @@ jobs:
     env:
       NPM_CONFIG_PRODUCTION: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -37,7 +37,7 @@ jobs:
     env:
       NPM_CONFIG_PRODUCTION: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -59,7 +59,7 @@ jobs:
       NPM_CONFIG_PRODUCTION: "false"
       CI: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
