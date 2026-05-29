@@ -65,7 +65,8 @@ describe("scrubSecretsInString", () => {
   });
 
   it("masks an sk- style key", () => {
-    expect(scrubSecretsInString("key=sk-ABCdef0123456789ghij end")).toBe("key=sk-[REDACTED] end");
+    const fakeKey = "sk-EXAMPLEEXAMPLEEXAMPLE"; // gitleaks:allow — synthetic test fixture
+    expect(scrubSecretsInString(`key=${fakeKey} end`)).toBe("key=sk-[REDACTED] end");
   });
 
   it("leaves a normal string untouched", () => {
@@ -85,7 +86,8 @@ describe("redact value-level scrubbing", () => {
   });
 
   it("masks an sk- key in a nested string value", () => {
-    const out = redact({ outer: { note: "using sk-ABCdef0123456789ghij now" } });
+    const fakeKey = "sk-EXAMPLEEXAMPLEEXAMPLE"; // gitleaks:allow — synthetic test fixture
+    const out = redact({ outer: { note: `using ${fakeKey} now` } });
     expect(out.outer.note).toBe("using sk-[REDACTED] now");
   });
 
