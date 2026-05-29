@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `pnpm.onlyBuiltDependencies` for `better-sqlite3` so its native binding compiles on install (incl. CI).
 
 ### Security
+- Value-level secret scrubbing in the logging pipeline: free-form string values (including the Winston `message` field) are now scanned for `Bearer <token>` and `sk-…` OpenAI-style keys and masked, complementing the existing key-name redaction (`src/logging/redact.ts`).
 - Bump `next` to `^14.2.35` and pin `uuid` `>=11.1.1` via pnpm override to patch GHSA-f82v-jwr5-mffw (Auth Bypass in Next.js Middleware, critical) and 8 high-severity Next.js advisories.
 - Add pnpm override `glob: ">=10.5.0"` to patch GHSA-5j98-mcp5-4vw2 (glob CLI command injection, high) in transitive deps.
 

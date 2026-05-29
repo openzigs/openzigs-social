@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSensitiveKey, REDACTED, redact } from "./redact.js";
+import { isSensitiveKey, REDACTED, redact, scrubSecretsInString } from "./redact.js";
 
 describe("redact", () => {
   it("redacts sensitive keys", () => {
@@ -54,5 +54,43 @@ describe("redact", () => {
   it("classifies keys", () => {
     expect(isSensitiveKey("client_secret")).toBe(true);
     expect(isSensitiveKey("username")).toBe(false);
+  });
+});
+
+describe("scrubSecretsInString", () => {
+  it("masks a Bearer token", () => {
+    expect(scrubSecretsInString("Authorization: Bearer abc.DEF-123_xyz")).toBe(
+      "Authorization: Bearer [REDACTED]"
+    );
+  });
+
+  it("masks an sk- style key", () => {
+    expect(scrubSecretsInString("key=sk-ABCdef0123456789ghij end")).toBe("key=sk-[REDACTED] end");
+  });
+
+  it("leaves a normal string untouched", () => {
+    const msg = "user logged in from 10.0.0.1";
+    expect(scrubSecretsInString(msg)).toBe(msg);
+  });
+
+  it("does not mask short sk- prefixes", () => {
+    expect(scrubSecretsInString("sk-tiny")).toBe("sk-tiny");
+  });
+});
+
+describe("redact value-level scrubbing", () => {
+  it("masks a Bearer token embedded in a message string", () => {
+    const out = redact({ message: "calling api with Bearer tok.en-VALUE_123" });
+    expect(out.message).toBe("calling api with Bearer [REDACTED]");
+  });
+
+  it("masks an sk- key in a nested string value", () => {
+    const out = redact({ outer: { note: "using sk-ABCdef0123456789ghij now" } });
+    expect(out.outer.note).toBe("using sk-[REDACTED] now");
+  });
+
+  it("leaves a normal message untouched", () => {
+    const out = redact({ message: "session restored for client-a" });
+    expect(out.message).toBe("session restored for client-a");
   });
 });

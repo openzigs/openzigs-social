@@ -80,6 +80,31 @@ Supported environment overrides:
 | `OPENZIGS_SOCIAL_LOG_TO_FILE` | Write rotating log files | `true` / `false` |
 | `OPENZIGS_SOCIAL_PRIVACY_MODE` | `off` / `session` / `global` | `session` |
 
+### HTTP endpoints
+
+The server exposes a few operational endpoints (bound to
+`OPENZIGS_SOCIAL_SERVER_HOST:PORT`):
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness — `200` with `{ status, uptimeMs }`. |
+| `GET /ready` | Readiness — `200`/`503` with per-dependency `checks`. |
+| `GET /api/metrics` | Per-platform counters as a flat JSON envelope. |
+
+`GET /api/metrics` returns JSON (not Prometheus plain-text):
+
+```json
+{
+  "timestamp": "2026-05-29T00:00:00.000Z",
+  "metrics": {
+    "twitter": { "sent": 3, "received": 12, "failed": 0 }
+  }
+}
+```
+
+The same `metrics` snapshot is pushed to connected UIs over Socket.IO as a
+`metrics:update` event whenever a counter changes.
+
 ## 11. Troubleshooting
 
 ### "Ollama unreachable" warning on launch

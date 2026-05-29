@@ -213,7 +213,10 @@ a promise chain so concurrent callers cannot interleave partial lines.
 * `GET /health` — liveness; returns `200` with `uptimeMs`.
 * `GET /ready` — readiness; returns `200`/`503` with a per-dependency
   report (`db`, `config`, `vault`).
-* `GET /api/metrics` — current per-platform counters (`sent`, `received`,
-  `failed`). The same snapshot is broadcast over Socket.IO as
-  `metrics:update` whenever a counter changes (`src/server/metrics.ts`).
+* `GET /api/metrics` — current per-platform counters. Responds with a flat
+  JSON envelope (not Prometheus plain-text):
+  `{ "timestamp": "<ISO-8601>", "metrics": { "<platform>": { "sent": n,
+  "received": n, "failed": n } } }`. The `metrics` snapshot is the same
+  payload broadcast over Socket.IO as `metrics:update` whenever a counter
+  changes (`src/server/metrics.ts`).
 
