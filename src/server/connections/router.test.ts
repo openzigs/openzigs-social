@@ -51,9 +51,17 @@ describe("connections router", () => {
     const body = (await res.json()) as {
       connections: Array<{ platform: string; connected: boolean; label: string }>;
     };
-    expect(body.connections.map((c) => c.platform)).toEqual(["instagram", "facebook", "threads"]);
+    expect(body.connections.map((c) => c.platform)).toEqual([
+      "instagram",
+      "facebook",
+      "threads",
+      "linkedin",
+      "pinterest",
+      "tiktok"
+    ]);
     expect(body.connections.every((c) => c.connected === false)).toBe(true);
     expect(body.connections.find((c) => c.platform === "facebook")?.label).toBe("Facebook Pages");
+    expect(body.connections.find((c) => c.platform === "tiktok")?.label).toBe("TikTok");
   });
 
   it("marks a platform connected once an OAuth token is stored", async () => {

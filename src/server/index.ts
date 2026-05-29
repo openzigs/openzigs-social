@@ -29,10 +29,15 @@ import {
   WebhookHandlerRegistry,
   RateLimitBroker,
   DlqRepository,
+  SocialBrainRepository,
   createOAuthRouter,
   createWebhookRouter
 } from "../platform/index.js";
 import { registerMetaConnectors } from "../connectors/meta/index.js";
+import { InsightsRepository } from "../connectors/meta/insights/repository.js";
+import { registerLinkedInConnectors } from "../connectors/linkedin/index.js";
+import { registerPinterestConnectors } from "../connectors/pinterest/index.js";
+import { registerTikTokConnectors } from "../connectors/tiktok/index.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
@@ -137,6 +142,99 @@ export async function startServer(): Promise<StartedServer> {
       });
     } catch (err) {
       logger.error("meta.register_failed", {
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+
+  // Cohort B connectors (#60) — opt-in, each with its own rate-limit budget.
+  // App creds/tokens are read from the vault (BYOK) and never logged. They
+  // share the SocialBrain (#143) and analytics (#96) stores with Cohort A.
+  const oauthCallbackBaseUrl = `http://${config.server.host}:${config.server.port}`;
+
+  if (config.platform.linkedin.enabled) {
+    try {
+      await registerLinkedInConnectors({
+        config: {
+          restBaseUrl: config.platform.linkedin.restBaseUrl,
+          oauthCallbackBaseUrl
+        },
+        registries: platform,
+        vault,
+        brain: new SocialBrainRepository(db),
+        broker: new RateLimitBroker({
+          budgets: {
+            linkedin: {
+              capacity: config.platform.linkedin.budget.requests,
+              refillPerSec:
+                config.platform.linkedin.budget.requests /
+                (config.platform.linkedin.budget.windowMs / 1000)
+            }
+          }
+        }),
+        dlq: new DlqRepository(db),
+        insights: new InsightsRepository(db)
+      });
+    } catch (err) {
+      logger.error("linkedin.register_failed", {
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+
+  if (config.platform.pinterest.enabled) {
+    try {
+      await registerPinterestConnectors({
+        config: {
+          apiBaseUrl: config.platform.pinterest.apiBaseUrl,
+          oauthCallbackBaseUrl
+        },
+        registries: platform,
+        vault,
+        broker: new RateLimitBroker({
+          budgets: {
+            pinterest: {
+              capacity: config.platform.pinterest.budget.requests,
+              refillPerSec:
+                config.platform.pinterest.budget.requests /
+                (config.platform.pinterest.budget.windowMs / 1000)
+            }
+          }
+        }),
+        dlq: new DlqRepository(db),
+        insights: new InsightsRepository(db)
+      });
+    } catch (err) {
+      logger.error("pinterest.register_failed", {
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+
+  if (config.platform.tiktok.enabled) {
+    try {
+      await registerTikTokConnectors({
+        config: {
+          apiBaseUrl: config.platform.tiktok.apiBaseUrl,
+          oauthCallbackBaseUrl
+        },
+        registries: platform,
+        vault,
+        broker: new RateLimitBroker({
+          budgets: {
+            tiktok: {
+              capacity: config.platform.tiktok.budget.requests,
+              refillPerSec:
+                config.platform.tiktok.budget.requests /
+                (config.platform.tiktok.budget.windowMs / 1000)
+            }
+          }
+        }),
+        dlq: new DlqRepository(db),
+        insights: new InsightsRepository(db)
+      });
+    } catch (err) {
+      logger.error("tiktok.register_failed", {
         error: err instanceof Error ? err.message : String(err)
       });
     }

@@ -73,6 +73,44 @@ aren't connected (or need reconnecting) are shown disabled with a hint. Tick the
 accounts you want, write your post, and the footer shows exactly where it will
 publish.
 
+## 5. Connecting LinkedIn, Pinterest & TikTok (Cohort B)
+
+openzigs-social can also publish to **LinkedIn**, **Pinterest**, and **TikTok**
+(epic #60). Each is independently opt-in — set the matching flag and restart:
+
+```json
+{
+  "platform": {
+    "linkedin": { "enabled": true },
+    "pinterest": { "enabled": true },
+    "tiktok": { "enabled": true }
+  }
+}
+```
+
+(or `OPENZIGS_SOCIAL_PLATFORM_LINKEDIN_ENABLED=true`, `…_PINTEREST_ENABLED`,
+`…_TIKTOK_ENABLED`). With a flag off, that platform makes no network calls.
+
+As with Meta, you bring your own app (BYOK): LinkedIn client id/secret,
+Pinterest app id/secret, TikTok client key/secret, and per-account tokens are
+all stored encrypted in the vault and never displayed or logged. After the OAuth
+handshake the account appears as connected in the composer's **Publish to** list
+alongside the Meta platforms.
+
+### Known limitations
+
+* **LinkedIn — no direct messages.** LinkedIn DM access is gated behind the
+  Compliance Partner Program. In v1, LinkedIn supports publishing posts (as a
+  member or organization) and reading comments + analytics only — there is no DM
+  sending or receiving, and the app refuses any messaging permission scope.
+* **TikTok — posts are private until audited.** TikTok requires apps to pass a
+  content-posting audit before they may publish publicly. Until then, every
+  TikTok video this app publishes is forced to **PRIVATE** (`SELF_ONLY`),
+  visible only to the connected account owner. The composer shows a notice
+  whenever you select TikTok. Public posting unlocks automatically once your
+  app's audit is approved by TikTok — no app changes are needed beyond that
+  approval.
+
 ## 8. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your

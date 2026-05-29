@@ -15,10 +15,13 @@ import { vaultPath } from "../config/paths.js";
 import { decrypt, deriveKey, encrypt, type Envelope } from "./crypto.js";
 import {
   EMPTY_VAULT,
+  type LinkedInAppCredential,
   type MetaAppCredential,
   type OAuthCredential,
+  type PinterestAppCredential,
   type ProviderCredential,
   type TelegramCredential,
+  type TikTokAppCredential,
   type Vault,
   VaultSchema
 } from "./types.js";
@@ -174,6 +177,39 @@ export class CredentialVault {
     return vault.meta;
   }
 
+  /** Persist LinkedIn app credentials for the Cohort B connector (epic #60). */
+  async setLinkedIn(cred: LinkedInAppCredential): Promise<void> {
+    const vault = await this.load();
+    await this.persist({ ...vault, linkedin: cred });
+  }
+
+  async getLinkedIn(): Promise<LinkedInAppCredential | undefined> {
+    const vault = await this.load();
+    return vault.linkedin;
+  }
+
+  /** Persist Pinterest app credentials for the Cohort B connector (epic #60). */
+  async setPinterest(cred: PinterestAppCredential): Promise<void> {
+    const vault = await this.load();
+    await this.persist({ ...vault, pinterest: cred });
+  }
+
+  async getPinterest(): Promise<PinterestAppCredential | undefined> {
+    const vault = await this.load();
+    return vault.pinterest;
+  }
+
+  /** Persist TikTok app credentials for the Cohort B connector (epic #60). */
+  async setTikTok(cred: TikTokAppCredential): Promise<void> {
+    const vault = await this.load();
+    await this.persist({ ...vault, tiktok: cred });
+  }
+
+  async getTikTok(): Promise<TikTokAppCredential | undefined> {
+    const vault = await this.load();
+    return vault.tiktok;
+  }
+
   /** Redacted JSON of vault structure — never includes secret material. */
   toString(): string {
     const v = this.cache ?? EMPTY_VAULT;
@@ -182,7 +218,10 @@ export class CredentialVault {
       providers: Object.keys(v.providers),
       oauth: Object.keys(v.oauth),
       telegram: v.telegram ? true : false,
-      meta: v.meta ? true : false
+      meta: v.meta ? true : false,
+      linkedin: v.linkedin ? true : false,
+      pinterest: v.pinterest ? true : false,
+      tiktok: v.tiktok ? true : false
     });
   }
 }

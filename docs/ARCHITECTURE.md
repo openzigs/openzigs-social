@@ -103,6 +103,7 @@ Layout under the data directory:
 | `platform/social-brain/` | Idempotent inbound persistence (contacts/threads/messages) (#143) |
 | `platform/dm/` | `SocialDmSenderRegistry` (the #51 port) + rule-chain `DmDispatcher` (#144) |
 | `connectors/meta/` | Cohort A connectors: Instagram + Facebook Pages + Threads via Meta Graph API `v25.0`, built on the #127 ports (epic #53) |
+| `connectors/{linkedin,pinterest,tiktok}/` | Cohort B connectors: LinkedIn (no DM) + Pinterest + TikTok (PRIVATE-only), built on the #127 ports (epic #60) |
 | `server/connections/router.ts` | `GET /api/connections` — per-platform connect/needs-reconsent status (never echoes tokens) (#53) |
 
 ## 5. UI map (`ui/`)
@@ -425,6 +426,68 @@ tokens themselves**. The Next.js composer (`ui/app/compose/page.tsx`) reads it
 via `lib/connections.ts` and renders a per-account publish-target checkbox
 (`components/compose/publish-targets.tsx`); disconnected accounts are shown
 disabled with a "connect"/"reconnect required" hint.
+
+## 12.4 Cohort B connectors — LinkedIn / Pinterest / TikTok (#60)
+
+`src/connectors/{linkedin,pinterest,tiktok}/` add three more connectors built on
+the **same** #127 ports as Cohort A — no connector owns rate-limit, retry,
+OAuth-callback, or webhook-verify code of its own. Each module is independently
+opt-in behind `platform.{linkedin,pinterest,tiktok}.enabled` (default `false`);
+when disabled there is zero network surface for that platform. All app
+credentials (LinkedIn client id/secret, Pinterest app id/secret, TikTok client
+key/secret) and per-account tokens are read from the encrypted vault
+(`getLinkedIn()` / `getPinterest()` / `getTikTok()`) — never config or logs —
+and every base/token URL passes through the SSRF guard.
+
+| Sub-issue | Module | Responsibility |
+| --- | --- | --- |
+| #61 | `linkedin/rest-client.ts` / `dispatcher.ts` / `oauth.ts` / `publisher.ts` / `comment-poller.ts` | REST transport + dispatcher, OAuth exchanger (no-DM scopes), Posts API publisher (member + organization), comment poll → SocialBrain |
+| #62 | `linkedin/analytics-poller.ts` | follower count + post engagement → `InsightsRepository` (reuses `platform_insights_raw`) |
+| #63 | `pinterest/rest-client.ts` / `dispatcher.ts` / `oauth.ts` / `publisher.ts` / `analytics-poller.ts` | REST transport + dispatcher, OAuth exchanger (HTTP Basic), board/pin publisher, pin analytics → `InsightsRepository` |
+| #64 | `tiktok/rest-client.ts` / `dispatcher.ts` / `oauth.ts` / `publisher.ts` / `display-poller.ts` | REST transport (200-with-`error`-envelope aware) + dispatcher, OAuth exchanger, video publisher, profile/video display poll → `InsightsRepository` |
+| — | `*/index.ts` | `register{LinkedIn,Pinterest,TikTok}Connectors` composition seam |
+
+### How each #127 port is consumed
+
+* **`OAuthTokenExchanger` (#139)** — each connector registers exactly one
+  exchanger (`linkedin` / `pinterest` / `tiktok`) into the shared
+  `ConnectorRegistry`, so the same `GET /oauth/callback/:platform` router
+  persists tokens to the vault unchanged. LinkedIn uses a form-body exchange,
+  Pinterest uses HTTP Basic auth, TikTok puts `client_key`/`client_secret` in
+  the form body.
+* **`RateLimitBroker` (#141)** — every mutating/poll op acquires a per-op slot
+  from that platform's budget (`linkedin` / `pinterest` / `tiktok`) before the
+  HTTP call; a denied slot lands in the DLQ instead of hammering the API.
+* **retry + DLQ (#142)** — per-platform `isTransient*Error` classifiers feed the
+  shared `dispatchWithDlq`; the dispatchers never throw.
+* **`SocialBrainRepository` (#143)** — LinkedIn's comment poller persists inbound
+  comments idempotently (skips already-seen platform message ids).
+* **analytics (#96)** — LinkedIn, Pinterest, and TikTok all reuse the existing
+  `InsightsRepository` / `platform_insights_raw` table (migration `0003`); no
+  new migration is introduced by this epic. Readings are idempotent on
+  `(platform, object_type, object_id, metric, captured_for)`.
+
+No Cohort B platform exposes inbound webhooks in v1, so each relies on the
+polling fallback only — no `WebhookHandler` is registered.
+
+### v1 platform limitations
+
+* **LinkedIn — no direct messages (#61).** LinkedIn DM requires the gated
+  Compliance Partner Program. The connector intentionally registers **no** DM
+  sender, and `assertNoDmScopes()` rejects any messaging scope at exchanger
+  construction (fails closed). LinkedIn v1 is publish + read-comments/analytics
+  only.
+* **TikTok — PRIVATE-only publishing (#65).** Until the app passes TikTok's
+  content-posting audit, the "Unaudited Client" restriction forces every post
+  to PRIVATE. `TikTokPublisher` hard-codes `privacy_level: "SELF_ONLY"` on every
+  request and `assertPrivateOnly()` throws if a caller ever requests a public or
+  mutual-follow visibility (fail closed); the public privacy levels are never
+  sent. The composer surfaces `TikTokNotice` whenever TikTok is selected so the
+  user understands the constraint before publishing.
+
+The connections endpoint and composer UI from §12.3 are platform-agnostic and
+extend to LinkedIn / Pinterest / TikTok automatically (the platform list lives
+in `src/server/connections/router.ts`).
 
 ## 13. Security model
 

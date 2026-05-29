@@ -56,4 +56,17 @@ describe("PublishTargets", () => {
     fireEvent.click(fb);
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
+
+  it("surfaces the TikTok PRIVATE-only notice only when TikTok is selected", async () => {
+    vi.spyOn(connectionsApi, "fetchConnections").mockResolvedValue([
+      { platform: "tiktok", label: "TikTok", connected: true, needsReconsent: false }
+    ]);
+    render(<PublishTargets />);
+    const tiktok = await screen.findByLabelText(/TikTok/);
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    fireEvent.click(tiktok);
+    expect(screen.getByRole("note")).toHaveTextContent(/SELF_ONLY/);
+    fireEvent.click(tiktok);
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
 });

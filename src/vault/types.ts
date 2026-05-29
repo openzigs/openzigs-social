@@ -50,13 +50,51 @@ export const MetaAppCredentialSchema = z
   })
   .strict();
 
+/**
+ * LinkedIn app credentials for the Cohort B connector (epic #60, sub #61/#62).
+ * Standard OAuth 2.0 client id + secret (BYOK). The secret signs the
+ * code→token exchange at runtime and is never logged nor echoed.
+ */
+export const LinkedInAppCredentialSchema = z
+  .object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1)
+  })
+  .strict();
+
+/**
+ * Pinterest app credentials for the Cohort B connector (epic #60, sub #63).
+ * v5 OAuth uses an app id + secret sent as HTTP Basic auth on token exchange.
+ */
+export const PinterestAppCredentialSchema = z
+  .object({
+    appId: z.string().min(1),
+    appSecret: z.string().min(1)
+  })
+  .strict();
+
+/**
+ * TikTok app credentials for the Cohort B connector (epic #60, sub #64/#65).
+ * Uses a client key + client secret. Until the app passes TikTok's content
+ * audit, publishing is constrained to PRIVATE (`SELF_ONLY`) posts.
+ */
+export const TikTokAppCredentialSchema = z
+  .object({
+    clientKey: z.string().min(1),
+    clientSecret: z.string().min(1)
+  })
+  .strict();
+
 export const VaultSchema = z
   .object({
     version: z.literal(1).default(1),
     providers: z.record(z.string(), ProviderCredentialSchema).default({}),
     oauth: z.record(z.string(), OAuthCredentialSchema).default({}),
     telegram: TelegramCredentialSchema.optional(),
-    meta: MetaAppCredentialSchema.optional()
+    meta: MetaAppCredentialSchema.optional(),
+    linkedin: LinkedInAppCredentialSchema.optional(),
+    pinterest: PinterestAppCredentialSchema.optional(),
+    tiktok: TikTokAppCredentialSchema.optional()
   })
   .strict();
 
@@ -64,6 +102,9 @@ export type ProviderCredential = z.infer<typeof ProviderCredentialSchema>;
 export type OAuthCredential = z.infer<typeof OAuthCredentialSchema>;
 export type TelegramCredential = z.infer<typeof TelegramCredentialSchema>;
 export type MetaAppCredential = z.infer<typeof MetaAppCredentialSchema>;
+export type LinkedInAppCredential = z.infer<typeof LinkedInAppCredentialSchema>;
+export type PinterestAppCredential = z.infer<typeof PinterestAppCredentialSchema>;
+export type TikTokAppCredential = z.infer<typeof TikTokAppCredentialSchema>;
 export type Vault = z.infer<typeof VaultSchema>;
 
 export const EMPTY_VAULT: Vault = { version: 1, providers: {}, oauth: {} };
