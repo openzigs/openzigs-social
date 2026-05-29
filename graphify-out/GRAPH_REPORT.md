@@ -1,7 +1,7 @@
 # Graph Report - openzigs-social  (2026-05-29)
 
 ## Corpus Check
-- 218 files · ~84,716 words
+- 218 files · ~84,781 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -65,10 +65,10 @@
   src/db/migrator.ts → src/platform/retry/backoff.test.ts
 - `bootstrap()` --calls--> `startServer()`  [INFERRED]
   src/server.ts → src/server/index.ts
-- `startServer()` --calls--> `registerMetaConnectors()`  [INFERRED]
-  src/server/index.ts → src/connectors/meta/index.ts
-- `validateProviderKey()` --calls--> `fetchImpl()`  [INFERRED]
-  src/server/setup/provider-validator.ts → src/connectors/meta/oauth.test.ts
+- `registerMetaConnectors()` --calls--> `startServer()`  [INFERRED]
+  src/connectors/meta/index.ts → src/server/index.ts
+- `fetchImpl()` --calls--> `validateProviderKey()`  [INFERRED]
+  src/connectors/meta/oauth.test.ts → src/server/setup/provider-validator.ts
 
 ## Communities
 
