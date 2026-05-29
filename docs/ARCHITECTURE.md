@@ -19,6 +19,8 @@
 13. Security model
 14. Observability (Winston + audit log)
 
+(See § 12.1 Telegram remote-control channel and § 12.2 Platform service layer.)
+
 ## 1. Overview
 
 _To be written._
@@ -94,6 +96,12 @@ Layout under the data directory:
 | `handoff/handoff-manager.ts` | `HandoffManager` — per-thread AI↔human ownership + draft cancellation (epic #128) |
 | `channels/telegram/` | Telegram remote-control channel: grammy bot, inline approval keyboards, `/queue` menu, DM relay, admin ACL (epic #47) |
 | `channels/social/dm-sender.ts` | `SocialDmSender` port — outbound DM contract implemented by the platform service (#127) |
+| `platform/oauth/` | OAuth handshake: CSRF state store, connector registry, callback router (#139) |
+| `platform/webhooks/` | Inbound webhooks: HMAC verify, dedupe ledger, handler registry, router (#140) |
+| `platform/rate-limit/` | Token bucket + per-platform broker with quotas/warnings (#141) |
+| `platform/retry/` | Exponential backoff, retry, dead-letter queue (#142) |
+| `platform/social-brain/` | Idempotent inbound persistence (contacts/threads/messages) (#143) |
+| `platform/dm/` | `SocialDmSenderRegistry` (the #51 port) + rule-chain `DmDispatcher` (#144) |
 
 ## 5. UI map (`ui/`)
 
@@ -134,6 +142,18 @@ inside its own transaction, and is recorded in the `schema_migrations`
 ledger (`version INTEGER PRIMARY KEY`, `applied_at`). Migration files are
 immutable once shipped. The `0001-init.sql` baseline creates a `meta`
 key/value table; feature tables are added by later epics.
+
+`0002-platform-service.sql` (epic #127) adds the persistence the connector
+epics, the inbox, the auto-reply pipeline, the outbox, and the DM dispatcher
+share:
+
+| Table | Purpose |
+|---|---|
+| `social_contacts` | Inbound contacts, idempotent on `UNIQUE (platform, platform_contact_id)` |
+| `social_threads` | Conversation threads, `UNIQUE (platform, platform_thread_id)`, FK → `social_contacts` |
+| `social_messages` | Inbound/outbound messages, `UNIQUE (platform, platform_message_id)`, FK → thread + contact |
+| `webhook_events` | Dedupe ledger, `UNIQUE (platform, event_id)` so replays are no-ops |
+| `outbox_dlq` | Dead-letter queue for terminally-failed outbound ops (#142) |
 
 ## 7. Copilot SDK runtime + smart router + privacy mode
 
@@ -263,6 +283,80 @@ delivers through the `SocialDmSender` port (`channels/social/dm-sender.ts`).
 No adapter is wired yet (the platform service #127 owns them), so the relay
 reports "unavailable" rather than faking a send — there are no stub network
 calls.
+
+## 12.2 Platform service layer (#127)
+
+`src/platform/` holds the cross-cutting, framework-agnostic primitives that
+every social connector (Cohort A/B/C), the unified inbox, the auto-reply
+pipeline, the outbox, and the DM dispatcher share. Every primitive takes an
+injected clock / `sleep` / `emit`, so the whole layer is deterministic under
+test — no real timers, no network.
+
+| Sub-issue | Module | Responsibility |
+| --- | --- | --- |
+| #139 | `oauth/` | OAuth handshake: CSRF state store, connector registry, callback router |
+| #140 | `webhooks/` | Inbound webhooks: HMAC verify, dedupe ledger, handler registry, router |
+| #141 | `rate-limit/` | Token bucket + per-platform broker with quotas and warnings |
+| #142 | `retry/` | Exponential backoff, retry, dead-letter queue |
+| #143 | `social-brain/` | Idempotent inbound persistence (contacts/threads/messages) |
+| #144 | `dm/` | DM sender registry (the #51 port) + rule-chain dispatcher |
+
+### OAuth (`oauth/`, #139)
+
+`OAuthStateStore` mints single-use, TTL-bounded `state` tokens
+(`randomBytes(32)`, base64url) and verifies them in constant time
+(`timingSafeEqual`); a consumed or expired state is rejected. `ConnectorRegistry`
+maps a platform key to an `OAuthTokenExchanger` port. `createOAuthRouter`
+exposes `GET /oauth/callback/:platform`:
+
+* unknown platform → **404**
+* missing / expired / replayed `state` → **400**
+* exchanger failure → **502** (no secret in the response)
+* success → persist `{ accessToken, refreshToken?, expiresAt }` via the vault,
+  then redirect to a path-validated success URL (open-redirect guarded).
+
+### Webhooks (`webhooks/`, #140)
+
+HMAC signatures are verified in constant time (`hmac.ts`, sha1/256/512).
+`WebhookEventStore.recordIfNew` dedupes deliveries with
+`INSERT … ON CONFLICT DO NOTHING` against `webhook_events`. `createWebhookRouter`
+mounts at `/webhooks/:platform` on the **raw** body (before `express.json`, so
+the signature is computed over exact bytes): bad signature → **401** (no body
+echo), duplicate event → **200**, handler throw → **500**.
+
+### Rate limiting (`rate-limit/`, #141)
+
+`TokenBucket` refills against an injected clock. `RateLimitBroker` holds a budget
+per platform (`capacity`, `refillPerSec`, optional hard `quota`): `tryAcquire`
+never blocks, `acquire` awaits the next refill via injected `sleep` (no tight
+loop), and an edge-triggered `rate-limit:warning` event fires once when
+utilization crosses 80% (re-arming after the bucket refills back below the
+threshold).
+
+### Retry + DLQ (`retry/`, #142)
+
+`computeBackoffMs` is exponential with jitter. `retry` loops up to `maxAttempts`,
+throwing `RetryExhaustedError` on the final attempt or immediately on a
+non-transient error. `dispatchWithDlq` **never throws** — a terminal failure is
+recorded in the `outbox_dlq` table via `DlqRepository` for later inspection.
+
+### SocialBrain (`social-brain/`, #143)
+
+`SocialBrainRepository` upserts contacts, threads, and messages idempotently,
+keyed on platform-native ids (`UNIQUE (platform, platform_*_id)`), so a webhook
+replay or backfill never duplicates rows.
+
+### DM dispatch + sender registry (`dm/`, #144)
+
+`SocialDmSenderRegistry` **implements the #51 `SocialDmSender` port** by
+delegating `sendDm` to a per-platform adapter registered at runtime. This is the
+seam that makes Telegram's `/dm` relay (#51) live: `startServer` builds one
+shared registry and hands it to both the platform layer and the Telegram
+channel, so once a connector registers an adapter the relay stops reporting
+"unavailable". `DmDispatcher` runs an ordered rule chain over each inbound DM —
+`humanOwnedGuard` (stops when the #128 `HandoffManager` marks the thread
+human-owned) and `approvalGatedReply` (routes a draft through the #128
+`ApprovalQueue` before sending).
 
 ## 13. Security model
 

@@ -72,6 +72,45 @@ export const ConfigSchema = z
         adminChatIds: z.array(z.string().min(1)).default([])
       })
       .strict()
+      .default({}),
+    platform: z
+      .object({
+        /**
+         * Inbound webhook receiver (#140). Disabled by default; connectors
+         * register HMAC-verified handlers and the router only mounts when on.
+         */
+        webhooks: z
+          .object({
+            enabled: booleanish.default(false),
+            /** Max accepted webhook body size in bytes (DoS guard). */
+            maxBodyBytes: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(1024 * 1024)
+          })
+          .strict()
+          .default({}),
+        /**
+         * OAuth callback router (#139). Disabled by default; mounts only when
+         * a connector has registered a token exchanger.
+         */
+        oauth: z
+          .object({
+            enabled: booleanish.default(false),
+            /** Same-origin relative path the UI is sent to after connecting. */
+            successRedirect: z.string().min(1).default("/"),
+            /** CSRF state lifetime in ms. */
+            stateTtlMs: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(10 * 60 * 1000)
+          })
+          .strict()
+          .default({})
+      })
+      .strict()
       .default({})
   })
   .strict();

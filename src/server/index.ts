@@ -21,9 +21,28 @@ import { createLogger } from "../logging/logger.js";
 import { closeDb, getDb } from "../db/index.js";
 import { TranscriptManager } from "../sessions/transcript-manager.js";
 import { CredentialVault } from "../vault/index.js";
+import {
+  ConnectorRegistry,
+  OAuthStateStore,
+  SocialDmSenderRegistry,
+  WebhookEventStore,
+  WebhookHandlerRegistry,
+  createOAuthRouter,
+  createWebhookRouter
+} from "../platform/index.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
+
+/** Live platform-service registries connectors register their adapters into. */
+export interface PlatformRegistries {
+  /** OAuth token exchangers, keyed by platform (#139). */
+  oauth: ConnectorRegistry;
+  /** Inbound webhook handlers, keyed by platform (#140). */
+  webhooks: WebhookHandlerRegistry;
+  /** Outbound DM sender adapters; satisfies the #51 SocialDmSender port (#144). */
+  dmSenders: SocialDmSenderRegistry;
+}
 
 export interface StartedServer {
   app: Express;
@@ -32,6 +51,8 @@ export interface StartedServer {
   db: Database;
   metrics: Metrics;
   port: number;
+  /** Platform-service registries (#127) for connectors to register into. */
+  platform: PlatformRegistries;
   close: () => Promise<void>;
 }
 
@@ -67,12 +88,51 @@ export async function startServer(): Promise<StartedServer> {
   const db = getDb();
   const transcripts = new TranscriptManager();
   const metrics = defaultMetrics;
+  const vault = new CredentialVault();
+
+  // Platform-service registries (#127). Connectors (Cohorts A/B/C) register
+  // their adapters into these at startup; the routers below dispatch through
+  // them. Empty registries simply yield 404s for unknown platforms.
+  const platform: PlatformRegistries = {
+    oauth: new ConnectorRegistry(),
+    webhooks: new WebhookHandlerRegistry(),
+    dmSenders: new SocialDmSenderRegistry()
+  };
+
+  // Adapt the winston logger to the (obj, msg) shape the platform routers use.
+  const routeLogger = {
+    info: (obj: unknown, msg?: string) => logger.info(msg ?? "", obj),
+    warn: (obj: unknown, msg?: string) => logger.warn(msg ?? "", obj),
+    error: (obj: unknown, msg?: string) => logger.error(msg ?? "", obj)
+  };
+
+  // OAuth callback router (#139) — opt-in.
+  const oauthRouter = config.platform.oauth.enabled
+    ? createOAuthRouter({
+        registry: platform.oauth,
+        stateStore: new OAuthStateStore({ ttlMs: config.platform.oauth.stateTtlMs }),
+        vault,
+        successRedirect: config.platform.oauth.successRedirect,
+        logger: routeLogger
+      })
+    : undefined;
+
+  // Webhook receiver router (#140) — opt-in.
+  const webhookRouter = config.platform.webhooks.enabled
+    ? createWebhookRouter({
+        registry: platform.webhooks,
+        eventStore: new WebhookEventStore(db),
+        maxBodyBytes: config.platform.webhooks.maxBodyBytes,
+        logger: routeLogger
+      })
+    : undefined;
 
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
-    vault: new CredentialVault(),
-    uiOrigin: config.server.uiOrigin
+    vault,
+    uiOrigin: config.server.uiOrigin,
+    platform: { oauthRouter, webhookRouter }
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {
@@ -99,6 +159,7 @@ export async function startServer(): Promise<StartedServer> {
         vault: new CredentialVault(),
         config: config.telegram,
         approvals: new ApprovalQueue({ defaultTimeoutMs: config.telegram.approvalTimeoutMs }),
+        dmSender: platform.dmSenders,
         logger
       });
       await telegram?.start();
@@ -121,5 +182,5 @@ export async function startServer(): Promise<StartedServer> {
     logger.info("server.stopped");
   };
 
-  return { app, httpServer, io, db, metrics, port, close };
+  return { app, httpServer, io, db, metrics, port, platform, close };
 }

@@ -9,7 +9,13 @@
  * The HTTP server + Socket.IO wiring lives in ./index.ts; this factory is kept
  * dependency-injected so it can be exercised without opening sockets.
  */
-import express, { type Express, type NextFunction, type Request, type Response } from "express";
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+  type Router
+} from "express";
 import helmet from "helmet";
 
 import type { CredentialVault } from "../vault/index.js";
@@ -32,6 +38,21 @@ export interface AppDeps {
   vault?: CredentialVault;
   /** Optional overrides for the setup router (used in tests). */
   setup?: Omit<SetupRouterDeps, "vault">;
+  /**
+   * Pre-built platform-service routers (#127), mounted when provided. They are
+   * constructed in ./index.ts from the connector registries so this factory
+   * stays decoupled from the platform internals (and trivially testable).
+   */
+  platform?: {
+    /** OAuth callback router (#139), mounted at `/oauth`. */
+    oauthRouter?: Router;
+    /**
+     * Webhook receiver router (#140), mounted at `/webhooks`. It captures the
+     * raw request body for HMAC verification, so it MUST be mounted before the
+     * global JSON body parser.
+     */
+    webhookRouter?: Router;
+  };
   /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
@@ -90,7 +111,20 @@ export function createApp(deps: AppDeps): Express {
   // defaults (CORP `same-origin`, COEP off in v7) do not strip ACAO, so no
   // helmet adjustment is needed.
   app.use(createCorsMiddleware(deps.uiOrigin ?? "http://localhost:3001"));
+
+  // Webhook receiver (#140) is mounted BEFORE the JSON parser because it must
+  // read the raw request body to verify the HMAC signature. Its own router
+  // applies an `express.raw` middleware scoped to `/webhooks`.
+  if (deps.platform?.webhookRouter) {
+    app.use("/webhooks", deps.platform.webhookRouter);
+  }
+
   app.use(express.json({ limit: "1mb" }));
+
+  // OAuth callback (#139) uses only query params, so it can mount after JSON.
+  if (deps.platform?.oauthRouter) {
+    app.use("/oauth", deps.platform.oauthRouter);
+  }
 
   // Liveness: 200 as long as the process is up.
   app.get("/health", (_req: Request, res: Response) => {
