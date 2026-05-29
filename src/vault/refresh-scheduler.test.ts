@@ -137,4 +137,33 @@ describe("TokenRefreshScheduler", () => {
     expect(r.has("x")).toBe(true);
     expect(typeof r.get("x")).toBe("function");
   });
+
+  it("calls logger.warn with a redacted structured payload on token:expired", async () => {
+    const vault = makeVault();
+    const registry = new RefreshRegistry();
+    const now = 0;
+    await vault.setOAuth("twitter", {
+      accessToken: "super-secret-access",
+      refreshToken: "super-secret-refresh",
+      expiresAt: now + 1
+    });
+    const logger = { warn: vi.fn() };
+    const scheduler = new TokenRefreshScheduler(vault, registry, { now: () => now, logger });
+    await scheduler.tick();
+
+    expect(logger.warn).toHaveBeenCalledOnce();
+    const [payload, message] = logger.warn.mock.calls[0]!;
+    expect(payload).toMatchObject({
+      event: "token_expired",
+      provider: "twitter",
+      platform: "twitter",
+      expiresAt: now + 1,
+      reason: "no-handler"
+    });
+    expect(message).toMatch(/re-consent required/i);
+    // Hard guarantee: never log token values.
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("super-secret-access");
+    expect(serialized).not.toContain("super-secret-refresh");
+  });
 });

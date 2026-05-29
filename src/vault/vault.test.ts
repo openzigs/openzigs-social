@@ -1,5 +1,5 @@
 import { mkdtempSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -92,5 +92,21 @@ describe("CredentialVault", () => {
 
   it("exposes the configured file path", () => {
     expect(ctx.vault.path).toBe(ctx.path);
+  });
+
+  it("refuses to load() when the file mode is weaker than 0o600", async () => {
+    // Write a valid-looking vault file but with insecure perms.
+    await ctx.vault.setProvider("openai", { apiKey: "k" });
+    await chmod(ctx.path, 0o644);
+    const fresh = new CredentialVault({ filePath: ctx.path, keyMaterial: "test-key" });
+    await expect(fresh.load()).rejects.toThrow(/0o644/);
+    await expect(fresh.load()).rejects.toThrow(/0o600/);
+  });
+
+  it("load() error mentions the actual and expected modes", async () => {
+    await writeFile(ctx.path, "{}", { mode: 0o600 });
+    await chmod(ctx.path, 0o666);
+    const fresh = new CredentialVault({ filePath: ctx.path, keyMaterial: "test-key" });
+    await expect(fresh.load()).rejects.toThrow(/insecure file mode 0o666.*expected 0o600/);
   });
 });

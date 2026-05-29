@@ -44,6 +44,12 @@ export interface SchedulerOptions {
   refreshWindowMs?: number;
   /** Override the clock (tests). */
   now?: () => number;
+  /** Structured logger. Receives a redacted payload — never token values. */
+  logger?: Logger;
+}
+
+export interface Logger {
+  warn(payload: Record<string, unknown>, message: string): void;
 }
 
 export interface TokenExpiredEvent {
@@ -62,6 +68,7 @@ export const DEFAULT_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000;
 export class TokenRefreshScheduler extends EventEmitter {
   private readonly refreshWindowMs: number;
   private readonly now: () => number;
+  private readonly logger: Logger;
 
   constructor(
     private readonly vault: CredentialVault,
@@ -71,6 +78,7 @@ export class TokenRefreshScheduler extends EventEmitter {
     super();
     this.refreshWindowMs = opts.refreshWindowMs ?? DEFAULT_REFRESH_WINDOW_MS;
     this.now = opts.now ?? Date.now;
+    this.logger = opts.logger ?? { warn: () => undefined };
   }
 
   /**
@@ -91,12 +99,12 @@ export class TokenRefreshScheduler extends EventEmitter {
 
       const handler = this.registry.get(platform);
       if (!handler) {
-        await this.markExpired(platform, "no-handler");
+        await this.markExpired(platform, "no-handler", cred.expiresAt);
         expired += 1;
         continue;
       }
       if (!cred.refreshToken) {
-        await this.markExpired(platform, "no-refresh-token");
+        await this.markExpired(platform, "no-refresh-token", cred.expiresAt);
         expired += 1;
         continue;
       }
@@ -112,7 +120,12 @@ export class TokenRefreshScheduler extends EventEmitter {
         this.emit("token:refreshed", evt);
         refreshed += 1;
       } catch (err) {
-        await this.markExpired(platform, "handler-error", String((err as Error).message ?? err));
+        await this.markExpired(
+          platform,
+          "handler-error",
+          cred.expiresAt,
+          String((err as Error).message ?? err)
+        );
         expired += 1;
       }
     }
@@ -122,10 +135,22 @@ export class TokenRefreshScheduler extends EventEmitter {
   private async markExpired(
     platform: string,
     reason: TokenExpiredEvent["reason"],
+    expiresAt: number | undefined,
     error?: string
   ): Promise<void> {
     await this.vault.updateOAuth(platform, { needsReconsent: true });
     const evt: TokenExpiredEvent = { platform, reason, ...(error ? { error } : {}) };
+    this.logger.warn(
+      {
+        event: "token_expired",
+        provider: platform,
+        platform,
+        expiresAt,
+        reason,
+        ...(error ? { error } : {})
+      },
+      "Token expired, re-consent required"
+    );
     this.emit("token:expired", evt);
   }
 }

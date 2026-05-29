@@ -7,7 +7,7 @@
  * - Never logs secrets; redacts on toString
  */
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir, hostname, platform, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -62,6 +62,15 @@ export class CredentialVault {
     if (!existsSync(this.filePath)) {
       this.cache = structuredClone(EMPTY_VAULT);
       return this.cache;
+    }
+    if (process.platform !== "win32") {
+      const st = await stat(this.filePath);
+      const mode = st.mode & 0o777;
+      if (mode !== VAULT_FILE_MODE) {
+        throw new Error(
+          `vault: refusing to load ${this.filePath}: insecure file mode 0o${mode.toString(8).padStart(3, "0")} (expected 0o${VAULT_FILE_MODE.toString(8).padStart(3, "0")})`
+        );
+      }
     }
     const raw = await readFile(this.filePath, "utf8");
     const env = JSON.parse(raw) as Envelope;
