@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **UI shell epic #41**: Next.js 16.2 App Router shell with shadcn/Radix primitives, top navigation, dark mode, dashboard, and client data providers.
+  - shadcn primitives (`button`, `card`, `dialog`, `dropdown-menu`, `input`, `label`, `tabs`, `toast` + `use-toast`/`toaster`) on Radix UI with Tailwind v4 CSS-first theming (#42).
+  - `components/top-nav.tsx`: primary top navigation with route links (Inbox, Compose, Calendar, Analytics, Contacts, Settings), active-route `aria-current`, and an accessible brand link (#43).
+  - `components/theme-provider.tsx` + `components/theme-toggle.tsx`: system/light/dark theme toggle with `localStorage` persistence, no-FOUC init script, and React View Transitions–animated theme switches via `document.startViewTransition` (#44).
+  - `app/page.tsx`: empty dashboard page with a KPI card layout shell and quick-actions dialog (#45).
+  - `app/providers.tsx`: React Query (`@tanstack/react-query`) provider plus a Socket.IO client that restores the persisted `clientId` from `localStorage` and re-persists the server-assigned session id on `session:restored` (#46).
+  - UI test harness: Vitest + Testing Library + jsdom with ESLint 9 flat config (`eslint-config-next` core-web-vitals + typescript) replacing the removed `next lint`.
 - Initial repository scaffold (Node 22 + TypeScript ESM + pnpm workspace, Next.js 14 UI shell, Vitest, ESLint, Prettier, CI / CodeQL / Gitleaks / graphify workflows, issue + PR templates).
 - **Foundation epic #28**: Copilot SDK wrapper, BYOK providers, Ollama + Gemma 4, smart router, privacy mode, credential vault.
   - Bumped `@github/copilot-sdk` to `^0.3.0` and audited 0.2→0.3 breaking changes (#130).
@@ -33,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `pnpm.onlyBuiltDependencies` for `better-sqlite3` so its native binding compiles on install (incl. CI).
 
 ### Security
+- Upgrade the `ui/` package from Next.js 14.2.35 to **16.2** (with `react`/`react-dom` pinned to identical `19.2.x`), clearing the residual high-severity Next.js advisories that required Next 15+ (content-injection / SSRF, cache-key confusion, image-optimization DoS, and middleware redirect / i18n bypass). `pnpm audit` in `ui/` now reports no high or critical findings.
 - Value-level secret scrubbing in the logging pipeline: free-form string values (including the Winston `message` field) are now scanned for `Bearer <token>` and `sk-…` OpenAI-style keys and masked, complementing the existing key-name redaction (`src/logging/redact.ts`).
 - Bump `next` to `^14.2.35` and pin `uuid` `>=11.1.1` via pnpm override to patch GHSA-f82v-jwr5-mffw (Auth Bypass in Next.js Middleware, critical) and 8 high-severity Next.js advisories.
 - Add pnpm override `glob: ">=10.5.0"` to patch GHSA-5j98-mcp5-4vw2 (glob CLI command injection, high) in transitive deps.
