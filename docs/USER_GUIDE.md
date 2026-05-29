@@ -47,7 +47,35 @@ progress if you refresh or close the tab:
 
 Only your *progress* is stored in the browser — secrets are held server-side in
 the encrypted vault (see §10). Telegram here is a minimal connection check; the
-full Telegram control surface arrives in epic #47.
+full Telegram control surface is described in §8.
+
+## 8. Approvals over Telegram
+
+Once a bot is connected and the channel is enabled, Telegram becomes your
+remote control. The bot is **deny-by-default**: it only obeys your configured
+admin chat and ignores everyone else.
+
+Enable it in config:
+
+```json
+{ "telegram": { "enabled": true } }
+```
+
+(or `OPENZIGS_SOCIAL_TELEGRAM_ENABLED=true`). The channel starts with the
+server; if credentials are missing it simply stays off and the server still
+runs. Full setup steps live in [docs/TELEGRAM_SETUP.md](TELEGRAM_SETUP.md).
+
+**Commands:** `/start`, `/status`, `/privacy`, `/queue`, and
+`/dm <platform> <recipient> <message>`.
+
+**Approving actions:** when something needs sign-off, the bot sends a message
+with ✅ Approve / ❌ Reject buttons. Tapping one settles the request and the
+message updates to show the outcome (Approved / Rejected / Timed out). `/queue`
+lists everything still pending.
+
+**DM relay:** `/dm` sends a direct message as you on a connected platform. Until
+a social platform is connected, the bot reports that DM delivery is unavailable
+rather than faking a send.
 
 ## 9. Privacy mode
 

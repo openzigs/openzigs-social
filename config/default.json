@@ -10,5 +10,11 @@
   },
   "privacy": {
     "mode": "off"
+  },
+  "telegram": {
+    "enabled": false,
+    "mode": "polling",
+    "approvalTimeoutMs": 0,
+    "adminChatIds": []
   }
 }
