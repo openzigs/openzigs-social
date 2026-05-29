@@ -143,6 +143,101 @@ export const ConfigSchema = z
               .default(5 * 60 * 1000)
           })
           .strict()
+          .default({}),
+        /**
+         * LinkedIn connector — Cohort B (#61/#62). Opt-in; the LinkedIn app
+         * client id/secret + per-account tokens live in the encrypted vault
+         * (BYOK), never here. v1 publishes posts + reads comments/analytics
+         * only — no DMs (Compliance Partner Program gated).
+         */
+        linkedin: z
+          .object({
+            enabled: booleanish.default(false),
+            /** LinkedIn REST host base (override for testing). */
+            restBaseUrl: z.string().url().default("https://api.linkedin.com/rest"),
+            /** Shared rate-limit budget: requests per window. */
+            budget: z
+              .object({
+                requests: z.coerce.number().int().positive().default(100),
+                windowMs: z.coerce
+                  .number()
+                  .int()
+                  .positive()
+                  .default(24 * 60 * 60 * 1000)
+              })
+              .strict()
+              .default({}),
+            /** Polling cadence (ms) for comments + analytics. */
+            pollIntervalMs: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(5 * 60 * 1000)
+          })
+          .strict()
+          .default({}),
+        /**
+         * Pinterest connector — Cohort B (#63). Opt-in; the Pinterest app
+         * id/secret + per-account tokens live in the encrypted vault (BYOK),
+         * never here. v1 creates boards/pins + reads pin analytics.
+         */
+        pinterest: z
+          .object({
+            enabled: booleanish.default(false),
+            /** Pinterest API v5 host base (override for testing). */
+            apiBaseUrl: z.string().url().default("https://api.pinterest.com/v5"),
+            /** Shared rate-limit budget: requests per window. */
+            budget: z
+              .object({
+                requests: z.coerce.number().int().positive().default(1000),
+                windowMs: z.coerce
+                  .number()
+                  .int()
+                  .positive()
+                  .default(60 * 60 * 1000)
+              })
+              .strict()
+              .default({}),
+            /** Polling cadence (ms) for pin analytics. */
+            pollIntervalMs: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(5 * 60 * 1000)
+          })
+          .strict()
+          .default({}),
+        /**
+         * TikTok connector — Cohort B (#64/#65). Opt-in; the TikTok client
+         * key/secret + per-account tokens live in the encrypted vault (BYOK),
+         * never here. v1 is constrained to PRIVATE (`SELF_ONLY`) publishing
+         * until the app passes TikTok's content-posting audit.
+         */
+        tiktok: z
+          .object({
+            enabled: booleanish.default(false),
+            /** TikTok Open API v2 host base (override for testing). */
+            apiBaseUrl: z.string().url().default("https://open.tiktokapis.com/v2"),
+            /** Shared rate-limit budget: requests per window. */
+            budget: z
+              .object({
+                requests: z.coerce.number().int().positive().default(600),
+                windowMs: z.coerce
+                  .number()
+                  .int()
+                  .positive()
+                  .default(24 * 60 * 60 * 1000)
+              })
+              .strict()
+              .default({}),
+            /** Polling cadence (ms) for video + profile display data. */
+            pollIntervalMs: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(5 * 60 * 1000)
+          })
+          .strict()
           .default({})
       })
       .strict()

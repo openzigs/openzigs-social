@@ -1,7 +1,13 @@
 import { API_URL } from "./socket";
 
-/** Meta platforms the composer can publish to (mirrors the server). */
-export type ConnectionPlatform = "instagram" | "facebook" | "threads";
+/** Platforms the composer can publish to (mirrors the server). */
+export type ConnectionPlatform =
+  | "instagram"
+  | "facebook"
+  | "threads"
+  | "linkedin"
+  | "pinterest"
+  | "tiktok";
 
 /** One connectable publish target, as returned by `GET /api/connections`. */
 export interface ConnectionSummary {

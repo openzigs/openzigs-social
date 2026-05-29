@@ -2,15 +2,21 @@ export { CredentialVault, defaultVaultPath, VAULT_DIR_MODE, VAULT_FILE_MODE } fr
 export type { VaultOptions } from "./vault.js";
 export {
   EMPTY_VAULT,
+  LinkedInAppCredentialSchema,
   MetaAppCredentialSchema,
   OAuthCredentialSchema,
+  PinterestAppCredentialSchema,
   ProviderCredentialSchema,
   TelegramCredentialSchema,
+  TikTokAppCredentialSchema,
   VaultSchema,
+  type LinkedInAppCredential,
   type MetaAppCredential,
   type OAuthCredential,
+  type PinterestAppCredential,
   type ProviderCredential,
   type TelegramCredential,
+  type TikTokAppCredential,
   type Vault
 } from "./types.js";
 export {

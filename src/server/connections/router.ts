@@ -18,18 +18,21 @@ export interface ConnectionsRouterDeps {
   vault: CredentialVault;
 }
 
-/** Publish-capable Meta platforms, in display order. */
-const META_PLATFORMS = ["instagram", "facebook", "threads"] as const;
-type MetaPlatform = (typeof META_PLATFORMS)[number];
+/** Publish-capable platforms, in display order. */
+const PLATFORMS = ["instagram", "facebook", "threads", "linkedin", "pinterest", "tiktok"] as const;
+type Platform = (typeof PLATFORMS)[number];
 
-const PLATFORM_LABELS: Record<MetaPlatform, string> = {
+const PLATFORM_LABELS: Record<Platform, string> = {
   instagram: "Instagram",
   facebook: "Facebook Pages",
-  threads: "Threads"
+  threads: "Threads",
+  linkedin: "LinkedIn",
+  pinterest: "Pinterest",
+  tiktok: "TikTok"
 };
 
 export interface ConnectionSummary {
-  platform: MetaPlatform;
+  platform: Platform;
   label: string;
   connected: boolean;
   /** True when a token refresh hard-failed and the user must reconnect. */
@@ -54,7 +57,7 @@ export function createConnectionsRouter(deps: ConnectionsRouterDeps): Router {
 
   router.get("/", limiter, async (_req: Request, res: Response) => {
     const oauth = await deps.vault.listOAuth();
-    const connections: ConnectionSummary[] = META_PLATFORMS.map((platform) => {
+    const connections: ConnectionSummary[] = PLATFORMS.map((platform) => {
       const cred = oauth[platform];
       return {
         platform,

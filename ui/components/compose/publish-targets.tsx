@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { fetchConnections, type ConnectionSummary } from "@/lib/connections";
+import { TikTokNotice } from "@/components/setup/tiktok-notice";
 
 export interface PublishTargetsProps {
   /** Reports the set of selected, connected platform keys to the parent. */
@@ -18,8 +19,9 @@ type LoadState =
  * Per-account publish-target picker for the composer (epic #53).
  *
  * Reads `GET /api/connections` and renders a checkbox per connected social
- * account (Instagram / Facebook Pages / Threads). Disconnected accounts are
- * shown disabled with a hint so the user knows to connect them first.
+ * account (Instagram / Facebook Pages / Threads / LinkedIn / Pinterest /
+ * TikTok). Disconnected accounts are shown disabled with a hint so the user
+ * knows to connect them first.
  */
 export function PublishTargets({ onSelectionChange }: PublishTargetsProps) {
   const [state, setState] = React.useState<LoadState>({ kind: "loading" });
@@ -100,6 +102,7 @@ export function PublishTargets({ onSelectionChange }: PublishTargetsProps) {
           </div>
         );
       })}
+      {selected.has("tiktok") && <TikTokNotice />}
     </fieldset>
   );
 }
