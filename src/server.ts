@@ -1,12 +1,29 @@
 /**
  * openzigs-social server entrypoint.
  *
- * This is a placeholder. Real wiring (Express + Socket.IO + sessions +
- * Copilot SDK + Telegram channel + platform pollers + approval queue) is
- * built across the Foundation epics. See docs/ARCHITECTURE.md.
+ * Boots the HTTP + Socket.IO server (Express + helmet, SQLite, sessions,
+ * logging, audit, metrics) via {@link startServer} and wires graceful
+ * shutdown on SIGINT/SIGTERM. Channel pollers, the Copilot SDK agent runtime,
+ * Telegram, and approval flows land in later epics.
  */
-export async function bootstrap(): Promise<void> {
-  // Intentionally empty for the initial scaffold.
+import { startServer, type StartedServer } from "./server/index.js";
+
+export async function bootstrap(): Promise<StartedServer> {
+  const server = await startServer();
+
+  const shutdown = (): void => {
+    server
+      .close()
+      .then(() => process.exit(0))
+      .catch((err: unknown) => {
+        console.error(err);
+        process.exit(1);
+      });
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  return server;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
