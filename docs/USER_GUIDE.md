@@ -25,8 +25,46 @@
 9. Privacy mode
 10. Troubleshooting
 
-## 1. Install
+## 9. Privacy mode
 
-_To be written._
+Three modes:
+
+* **off** — smart router is free to escalate long prompts to your
+  configured cloud provider (OpenAI / Anthropic / OpenAI-compatible).
+  Short prompts (≤ 4 096 estimated tokens by default) always stay local.
+* **session** — every prompt in the current process routes to your local
+  Ollama / Gemma 4 instance. Existing sessions switch on the next turn.
+  Cloud providers stay configured but unused.
+* **global** — persistent kill-switch. Cloud providers refuse to be
+  constructed at all; the smart router can only see your local provider.
+  Use this when you must guarantee no prompt ever leaves the host.
+
+Switch modes from the UI privacy panel or programmatically via
+`wrapper.setPrivacyMode("session" | "global" | "off")`.
+
+## 10. Where are my credentials stored?
+
+In an encrypted vault at `~/.openzigs-social/auth.json` (file mode
+`0o600`, parent directory `0o700`). The vault uses AES-256-GCM envelope
+encryption with a key derived from your machine identifier. All API keys,
+OAuth refresh tokens, and per-provider settings live there — nothing is
+ever written to disk in plaintext.
+
+## 11. Troubleshooting
+
+### "Ollama unreachable" warning on launch
+
+The wrapper probes `http://localhost:11434/api/tags`. If Ollama isn't
+running, the app falls back to whichever BYOK provider you have
+configured. Start Ollama (`ollama serve`) and either install a Gemma 4
+variant manually (`ollama pull gemma4:e2b`) or accept the in-app prompt
+on next launch.
+
+### A platform connector says "needs reconsent"
+
+Your OAuth refresh token has hard-expired. Open the affected platform
+panel and walk through the re-auth flow; the vault entry is updated
+atomically on success.
+
 
 ## 2–10. _To be written._
