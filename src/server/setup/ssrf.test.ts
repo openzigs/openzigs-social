@@ -53,4 +53,33 @@ describe("assertSafeUrl", () => {
     expect(isSafeUrl("http://[fe80::1]/v1")).toBe(false);
     expect(isSafeUrl("http://[::]/v1")).toBe(false);
   });
+
+  it("blocks alternate IPv4 encodings that canonicalize to loopback", () => {
+    // 127.0.0.1 expressed as decimal, hex, octal, and short forms.
+    expect(isSafeUrl("http://2130706433/v1")).toBe(false); // decimal
+    expect(isSafeUrl("http://0x7f000001/v1")).toBe(false); // hex
+    expect(isSafeUrl("http://017700000001/v1")).toBe(false); // octal
+    expect(isSafeUrl("http://127.1/v1")).toBe(false); // short form
+    expect(isSafeUrl("http://0x7f.0.0.1/v1")).toBe(false); // mixed hex octet
+  });
+
+  it("blocks the CGNAT 100.64.0.0/10 range", () => {
+    expect(isSafeUrl("http://100.64.0.1/v1")).toBe(false);
+    expect(isSafeUrl("http://100.127.255.255/v1")).toBe(false);
+    // Boundaries just outside CGNAT remain allowed.
+    expect(isSafeUrl("http://100.63.255.255/v1")).toBe(true);
+    expect(isSafeUrl("http://100.128.0.1/v1")).toBe(true);
+  });
+
+  it("blocks IPv4-mapped IPv6 addresses pointing at loopback/private hosts", () => {
+    expect(isSafeUrl("http://[::ffff:127.0.0.1]/v1")).toBe(false); // dotted mapped
+    expect(isSafeUrl("http://[::ffff:7f00:1]/v1")).toBe(false); // hex mapped form
+    expect(isSafeUrl("http://[::ffff:10.0.0.1]/v1")).toBe(false); // mapped RFC1918
+    expect(isSafeUrl("http://[::ffff:169.254.169.254]/v1")).toBe(false); // mapped metadata
+  });
+
+  it("still allows a normal public host", () => {
+    expect(isSafeUrl("https://api.example.com/v1")).toBe(true);
+    expect(assertSafeUrl("https://api.example.com/v1").hostname).toBe("api.example.com");
+  });
 });

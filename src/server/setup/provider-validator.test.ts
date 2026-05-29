@@ -87,4 +87,46 @@ describe("validateProviderKey", () => {
     );
     expect(JSON.stringify(res)).not.toContain("sk-SHOULD-NOT-LEAK");
   });
+
+  it("requests outbound validation with redirects disabled (redirect: manual)", async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      expect(init?.redirect).toBe("manual");
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    await validateProviderKey(
+      { provider: "openai-compatible", apiKey: "k", baseUrl: "https://api.groq.com/openai/v1" },
+      fetchImpl
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a 3xx redirect on the openai-compatible path as a validation failure without following it", async () => {
+    const fetchImpl = vi.fn(async () => {
+      // A hostile endpoint tries to bounce us to an internal host.
+      return new Response(null, {
+        status: 302,
+        headers: { location: "http://169.254.169.254/latest/meta-data" }
+      });
+    }) as unknown as typeof fetch;
+    const res = await validateProviderKey(
+      { provider: "openai-compatible", apiKey: "k", baseUrl: "https://api.groq.com/openai/v1" },
+      fetchImpl
+    );
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/redirect/i);
+    // Must NOT have followed the redirect to the metadata host.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an opaqueredirect response as a validation failure", async () => {
+    // With redirect: "manual", a real fetch yields an opaque redirect (status 0).
+    const opaque = { ok: false, status: 0, type: "opaqueredirect" } as unknown as Response;
+    const fetchImpl = vi.fn(async () => opaque) as unknown as typeof fetch;
+    const res = await validateProviderKey(
+      { provider: "openai-compatible", apiKey: "k", baseUrl: "https://api.groq.com/openai/v1" },
+      fetchImpl
+    );
+    expect(res.valid).toBe(false);
+    expect(res.reason).toMatch(/redirect/i);
+  });
 });

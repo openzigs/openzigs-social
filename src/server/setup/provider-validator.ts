@@ -84,7 +84,14 @@ export async function validateProviderKey(
 ): Promise<ValidateKeyResult> {
   const { url, headers } = buildRequest(input);
   try {
-    const res = await fetchImpl(url, { method: "GET", headers });
+    // SSRF hardening: never auto-follow redirects. A hostile openai-compatible
+    // endpoint could 3xx us to an internal/metadata host that the pre-flight
+    // guard already cleared. With `redirect: "manual"` a real fetch yields an
+    // opaque-redirect response (status 0) instead of chasing the Location.
+    const res = await fetchImpl(url, { method: "GET", headers, redirect: "manual" });
+    if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+      return { valid: false, status: res.status, reason: "provider attempted a redirect" };
+    }
     if (res.ok) return { valid: true, status: res.status };
     return { valid: false, status: res.status, reason: `provider returned HTTP ${res.status}` };
   } catch {
