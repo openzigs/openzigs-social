@@ -1,0 +1,55 @@
+/**
+ * Configuration schema (Zod) for openzigs-social.
+ *
+ * A single schema validates the *merged* result of the layered config
+ * (default.json -> user.json -> env). Invalid config fails fast with a
+ * readable error. See ./index.ts for the layering logic.
+ */
+import { z } from "zod";
+
+/**
+ * Boolean that also accepts the string forms env vars produce
+ * (`"true"`/`"false"`/`"1"`/`"0"`...). `z.coerce.boolean()` is unusable here
+ * because it treats any non-empty string (including `"false"`) as `true`.
+ */
+const booleanish = z.preprocess((v) => {
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (["false", "0", "no", "off", ""].includes(s)) return false;
+    if (["true", "1", "yes", "on"].includes(s)) return true;
+  }
+  return v;
+}, z.boolean());
+
+export const ConfigSchema = z
+  .object({
+    server: z
+      .object({
+        /** Loopback bind address. */
+        host: z.string().min(1).default("127.0.0.1"),
+        /** HTTP + Socket.IO port. 0 lets the OS pick an ephemeral port. */
+        port: z.coerce.number().int().min(0).max(65535).default(3000),
+        /** Allowed UI origin for CORS (Socket.IO + REST). */
+        uiOrigin: z.string().url().default("http://localhost:3001")
+      })
+      .strict()
+      .default({}),
+    logging: z
+      .object({
+        level: z.enum(["error", "warn", "info", "debug"]).default("info"),
+        /** Write a rotating log file under <dataDir>/logs in addition to stdout. */
+        toFile: booleanish.default(true)
+      })
+      .strict()
+      .default({}),
+    privacy: z
+      .object({
+        /** Hard kill-switch forcing local-only LLM routing. */
+        mode: z.enum(["off", "session", "global"]).default("off")
+      })
+      .strict()
+      .default({})
+  })
+  .strict();
+
+export type Config = z.infer<typeof ConfigSchema>;
