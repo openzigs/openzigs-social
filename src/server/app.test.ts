@@ -106,3 +106,81 @@ describe("createApp setup-wizard wiring", () => {
     expect((await res.json()).complete).toBe(false);
   });
 });
+
+describe("createApp CORS", () => {
+  const UI_ORIGIN = "http://localhost:3001";
+  let server: Server;
+  let base: string;
+  let dir: string;
+
+  function makeVault() {
+    dir = mkdtempSync(join(tmpdir(), "ozs-app-cors-"));
+    return new CredentialVault({ filePath: join(dir, "auth.json"), keyMaterial: "k" });
+  }
+
+  afterEach(async () => {
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("echoes the configured origin on an OPTIONS preflight", async () => {
+    const app = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true }),
+      vault: makeVault(),
+      uiOrigin: UI_ORIGIN
+    });
+    ({ server, base } = await listen(app));
+    const res = await fetch(`${base}/api/setup/validate-key`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: UI_ORIGIN,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type"
+      }
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(UI_ORIGIN);
+    expect(res.headers.get("access-control-allow-methods")).toContain("POST");
+    expect(res.headers.get("access-control-allow-headers")?.toLowerCase()).toContain(
+      "content-type"
+    );
+    expect(res.headers.get("vary")).toContain("Origin");
+  });
+
+  it("echoes the configured origin on an actual POST /api/setup/validate-key", async () => {
+    const app = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true }),
+      vault: makeVault(),
+      uiOrigin: UI_ORIGIN
+    });
+    ({ server, base } = await listen(app));
+    const res = await fetch(`${base}/api/setup/validate-key`, {
+      method: "POST",
+      headers: { Origin: UI_ORIGIN, "content-type": "application/json" },
+      body: JSON.stringify({ provider: "openai", apiKey: "" })
+    });
+    // Body is intentionally invalid (empty apiKey) so we don't hit the network;
+    // the point is the ACAO header is present on the real (non-preflight) response.
+    expect(res.headers.get("access-control-allow-origin")).toBe(UI_ORIGIN);
+    expect(res.headers.get("vary")).toContain("Origin");
+  });
+
+  it("does not echo a disallowed origin (no wildcard, no reflection)", async () => {
+    const app = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true }),
+      vault: makeVault(),
+      uiOrigin: UI_ORIGIN
+    });
+    ({ server, base } = await listen(app));
+    const res = await fetch(`${base}/api/setup/validate-key`, {
+      method: "OPTIONS",
+      headers: { Origin: "http://evil.example", "Access-Control-Request-Method": "POST" }
+    });
+    const acao = res.headers.get("access-control-allow-origin");
+    expect(acao).not.toBe("http://evil.example");
+    expect(acao).not.toBe("*");
+    expect(acao).toBeNull();
+  });
+});

@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/server/metrics.ts`: per-platform sent/received/failed counters emitting `update` events, broadcast over Socket.IO (#132).
   - Added `pnpm.onlyBuiltDependencies` for `better-sqlite3` so its native binding compiles on install (incl. CI).
 
+### Fixed
+- REST API now sends CORS headers scoped to the configured `server.uiOrigin`, so the browser UI (Next.js dev server on a different port) can reach the setup-wizard endpoints (`POST /api/setup/validate-key`, `POST /api/setup/telegram/verify`, `GET /api/setup/status`); previously cross-origin preflight was blocked with a missing `Access-Control-Allow-Origin` header. Hand-rolled middleware (no new dependency), single-origin only — no wildcard or arbitrary-origin reflection — matching the Socket.IO CORS posture (no credentials).
+- Added `ui/app/icon.svg` so the app serves a favicon, eliminating the `favicon.ico` 404 on every page.
+
 ### Security
 - Upgrade the `ui/` package from Next.js 14.2.35 to **16.2** (with `react`/`react-dom` pinned to identical `19.2.x`), clearing the residual high-severity Next.js advisories that required Next 15+ (content-injection / SSRF, cache-key confusion, image-optimization DoS, and middleware redirect / i18n bypass). `pnpm audit` in `ui/` now reports no high or critical findings.
 - Value-level secret scrubbing in the logging pipeline: free-form string values (including the Winston `message` field) are now scanned for `Bearer <token>` and `sk-…` OpenAI-style keys and masked, complementing the existing key-name redaction (`src/logging/redact.ts`).

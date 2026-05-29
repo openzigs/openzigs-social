@@ -66,7 +66,8 @@ export async function startServer(): Promise<StartedServer> {
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
-    vault: new CredentialVault()
+    vault: new CredentialVault(),
+    uiOrigin: config.server.uiOrigin
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {
