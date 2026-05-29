@@ -25,6 +25,30 @@
 9. Privacy mode
 10. Troubleshooting
 
+## 2. First-run setup wizard
+
+(Currently a minimal skeleton — epic #129. The polished, guided onboarding
+experience is tracked in #100.)
+
+Open `/setup` in the app. The wizard has three steps and remembers your
+progress if you refresh or close the tab:
+
+1. **Welcome** — a short intro. Click **Next** to begin.
+2. **AI provider** — pick **OpenAI**, **Anthropic**, or **OpenAI-compatible**,
+   then paste your BYOK API key (for OpenAI-compatible, also enter the base
+   URL). Click **Validate & save** — the local server checks the key against
+   the provider's `/models` endpoint and, on success, stores it encrypted in
+   the vault. Your key is never displayed again and never leaves your machine
+   beyond that one validation call.
+3. **Telegram** — create a bot with [@BotFather](https://t.me/BotFather), then
+   enter its **bot token** and your numeric **admin chat id**. Click **Verify &
+   save** — the server confirms the bot via `getMe` and sends a one-time test
+   message to your admin chat. If it arrives, you're connected.
+
+Only your *progress* is stored in the browser — secrets are held server-side in
+the encrypted vault (see §10). Telegram here is a minimal connection check; the
+full Telegram control surface arrives in epic #47.
+
 ## 9. Privacy mode
 
 Three modes:
@@ -90,6 +114,9 @@ The server exposes a few operational endpoints (bound to
 | `GET /health` | Liveness — `200` with `{ status, uptimeMs }`. |
 | `GET /ready` | Readiness — `200`/`503` with per-dependency `checks`. |
 | `GET /api/metrics` | Per-platform counters as a flat JSON envelope. |
+| `POST /api/setup/validate-key` | Validate + store a BYOK provider key. |
+| `POST /api/setup/telegram/verify` | Verify + store a Telegram bot connection. |
+| `GET /api/setup/status` | First-run setup completion status. |
 
 `GET /api/metrics` returns JSON (not Prometheus plain-text):
 

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Setup wizard epic #129** (minimal skeleton): first-run multi-step wizard to connect an AI provider and a Telegram bot.
+  - `ui/app/setup/page.tsx` + `ui/components/setup/`: 3-step React wizard (Welcome → AI provider → Telegram) with an accessible step indicator and progress persisted across refreshes via `localStorage` (`useSyncExternalStore`); only progress flags are persisted — never secrets (#101).
+  - `src/server/setup/provider-validator.ts` + `POST /api/setup/validate-key`: BYOK key entry for OpenAI / Anthropic / OpenAI-compatible, validated server-side against the provider's lightweight `/models` endpoint (key never leaves the local server) and stored encrypted in the vault (`0o600`); OpenAI-compatible base URLs are SSRF-guarded via `src/server/setup/ssrf.ts` (#103).
+  - `src/server/setup/telegram-verify.ts` + `POST /api/setup/telegram/verify`: Telegram bot connection (bot token + admin chat id) verified via `getMe`, followed by a one-time test message to the admin chat; token + chat id stored in the vault (#104).
+  - `GET /api/setup/status`: reports `{ complete, hasProvider, hasTelegram }`.
+  - Telegram support here is a minimal verification skeleton — full Telegram integration lands in epic #47, and the polished onboarding experience remains tracked in #100.
 - **UI shell epic #41**: Next.js 16.2 App Router shell with shadcn/Radix primitives, top navigation, dark mode, dashboard, and client data providers.
   - shadcn primitives (`button`, `card`, `dialog`, `dropdown-menu`, `input`, `label`, `tabs`, `toast` + `use-toast`/`toaster`) on Radix UI with Tailwind v4 CSS-first theming (#42).
   - `components/top-nav.tsx`: primary top navigation with route links (Inbox, Compose, Calendar, Analytics, Contacts, Settings), active-route `aria-current`, and an accessible brand link (#43).

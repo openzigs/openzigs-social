@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type Server } from "node:http";
 import { type AddressInfo } from "node:net";
 
 import { createApp, type ReadinessReport } from "./app.js";
 import { Metrics } from "./metrics.js";
+import { CredentialVault } from "../vault/index.js";
 
 function listen(app: ReturnType<typeof createApp>): Promise<{ server: Server; base: string }> {
   return new Promise((resolve) => {
@@ -67,5 +71,38 @@ describe("createApp", () => {
   it("does not leak x-powered-by", async () => {
     const res = await fetch(`${base}/health`);
     expect(res.headers.get("x-powered-by")).toBeNull();
+  });
+});
+
+describe("createApp setup-wizard wiring", () => {
+  let server: Server;
+  let base: string;
+
+  afterEach(async () => {
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("does not mount /api/setup when no vault is provided", async () => {
+    const app = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true })
+    });
+    ({ server, base } = await listen(app));
+    const res = await fetch(`${base}/api/setup/status`);
+    expect(res.status).toBe(404);
+  });
+
+  it("mounts /api/setup/status when a vault is provided", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ozs-app-setup-"));
+    const vault = new CredentialVault({ filePath: join(dir, "auth.json"), keyMaterial: "k" });
+    const app = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true }),
+      vault
+    });
+    ({ server, base } = await listen(app));
+    const res = await fetch(`${base}/api/setup/status`);
+    expect(res.status).toBe(200);
+    expect((await res.json()).complete).toBe(false);
   });
 });

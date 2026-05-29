@@ -15,6 +15,7 @@ import { AuditLogger } from "../logging/audit-logger.js";
 import { createLogger } from "../logging/logger.js";
 import { closeDb, getDb } from "../db/index.js";
 import { TranscriptManager } from "../sessions/transcript-manager.js";
+import { CredentialVault } from "../vault/index.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
@@ -62,7 +63,11 @@ export async function startServer(): Promise<StartedServer> {
   const transcripts = new TranscriptManager();
   const metrics = defaultMetrics;
 
-  const app = createApp({ metrics, checkReadiness: buildReadinessCheck(db) });
+  const app = createApp({
+    metrics,
+    checkReadiness: buildReadinessCheck(db),
+    vault: new CredentialVault()
+  });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {
     uiOrigin: config.server.uiOrigin,

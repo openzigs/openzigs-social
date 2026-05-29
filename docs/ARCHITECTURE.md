@@ -245,3 +245,29 @@ a promise chain so concurrent callers cannot interleave partial lines.
   payload broadcast over Socket.IO as `metrics:update` whenever a counter
   changes (`src/server/metrics.ts`).
 
+### Setup wizard endpoints (`src/server/setup/`)
+
+First-run wizard support (epic #129). All routes are mounted under `/api/setup`
+and require an injected `CredentialVault`; secrets are validated server-side and
+persisted to the vault — keys/tokens never leave the local process beyond the
+provider/Telegram verification call, and are never logged or echoed back.
+
+* `POST /api/setup/validate-key` — body `{ provider, apiKey, baseUrl?, model? }`
+  where `provider ∈ { openai, anthropic, openai-compatible }`. Validates the
+  BYOK key against the provider's lightweight `/models` endpoint
+  (`provider-validator.ts`), then stores it via `vault.setProvider`. Returns
+  `{ valid: true, provider, stored: true }` on success, `{ valid: false,
+  provider, reason }` for a rejected key, or `400` for a malformed body / blocked
+  base URL. OpenAI-compatible base URLs pass through the SSRF guard in
+  `ssrf.ts` (blocks loopback, RFC1918, link-local/metadata, non-HTTP(S)).
+* `POST /api/setup/telegram/verify` — body `{ botToken, adminChatId }`. Calls
+  Telegram `getMe`, then sends a one-time test message to the admin chat
+  (`telegram-verify.ts`); on success stores both via `vault.setTelegram`.
+  Returns `{ valid: true, stored: true, botUsername? }` or `{ valid: false,
+  reason }`.
+* `GET /api/setup/status` — returns `{ complete, hasProvider, hasTelegram }`
+  derived from current vault contents.
+
+This is a minimal verification skeleton; full Telegram integration is tracked in
+epic #47 and the polished onboarding flow in #100.
+

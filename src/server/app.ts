@@ -12,7 +12,9 @@
 import express, { type Express, type Request, type Response } from "express";
 import helmet from "helmet";
 
+import type { CredentialVault } from "../vault/index.js";
 import type { Metrics } from "./metrics.js";
+import { createSetupRouter, type SetupRouterDeps } from "./setup/router.js";
 
 export interface ReadinessReport {
   db: boolean;
@@ -26,6 +28,10 @@ export interface AppDeps {
   checkReadiness: () => ReadinessReport | Promise<ReadinessReport>;
   /** Process start time for uptime reporting. */
   startedAt?: number;
+  /** Credential vault. When provided, mounts the setup-wizard routes (#129). */
+  vault?: CredentialVault;
+  /** Optional overrides for the setup router (used in tests). */
+  setup?: Omit<SetupRouterDeps, "vault">;
 }
 
 export function createApp(deps: AppDeps): Express {
@@ -52,6 +58,9 @@ export function createApp(deps: AppDeps): Express {
   api.get("/metrics", (_req: Request, res: Response) => {
     res.status(200).json({ timestamp: new Date().toISOString(), metrics: deps.metrics.snapshot() });
   });
+  if (deps.vault) {
+    api.use("/setup", createSetupRouter({ vault: deps.vault, ...deps.setup }));
+  }
   app.use("/api", api);
 
   return app;
