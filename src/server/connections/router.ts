@@ -10,6 +10,7 @@
  * returned, in the flat JSON envelope used across the API.
  */
 import { Router, type Request, type Response } from "express";
+import rateLimit from "express-rate-limit";
 
 import type { CredentialVault } from "../../vault/index.js";
 
@@ -41,7 +42,17 @@ export interface ConnectionSummary {
 export function createConnectionsRouter(deps: ConnectionsRouterDeps): Router {
   const router = Router();
 
-  router.get("/", async (_req: Request, res: Response) => {
+  // Rate-limit the credential-backed read so a misbehaving (or hostile) client
+  // can't hammer the vault: 60 requests/minute per IP is ample for the UI,
+  // which polls connection status at most a few times per page view.
+  const limiter = rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+
+  router.get("/", limiter, async (_req: Request, res: Response) => {
     const oauth = await deps.vault.listOAuth();
     const connections: ConnectionSummary[] = META_PLATFORMS.map((platform) => {
       const cred = oauth[platform];
