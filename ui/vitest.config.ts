@@ -18,7 +18,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      include: ["components/**", "lib/**", "hooks/**", "app/page.tsx"],
+      include: ["components/**", "lib/**", "hooks/**", "app/page.tsx", "app/setup/**"],
       exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts", "components/ui/**", "app/providers.tsx"],
       thresholds: {
         lines: 80,

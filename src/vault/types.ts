@@ -25,16 +25,30 @@ export const OAuthCredentialSchema = z
   })
   .strict();
 
+/**
+ * Telegram bot credentials captured by the setup wizard (epic #129, sub #104).
+ * The bot token is treated like any other secret — encrypted at rest, never
+ * logged, never echoed in API responses.
+ */
+export const TelegramCredentialSchema = z
+  .object({
+    botToken: z.string().min(1),
+    adminChatId: z.string().min(1)
+  })
+  .strict();
+
 export const VaultSchema = z
   .object({
     version: z.literal(1).default(1),
     providers: z.record(z.string(), ProviderCredentialSchema).default({}),
-    oauth: z.record(z.string(), OAuthCredentialSchema).default({})
+    oauth: z.record(z.string(), OAuthCredentialSchema).default({}),
+    telegram: TelegramCredentialSchema.optional()
   })
   .strict();
 
 export type ProviderCredential = z.infer<typeof ProviderCredentialSchema>;
 export type OAuthCredential = z.infer<typeof OAuthCredentialSchema>;
+export type TelegramCredential = z.infer<typeof TelegramCredentialSchema>;
 export type Vault = z.infer<typeof VaultSchema>;
 
 export const EMPTY_VAULT: Vault = { version: 1, providers: {}, oauth: {} };

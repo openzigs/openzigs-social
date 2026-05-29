@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Hardened the setup-wizard SSRF guard (`src/server/setup/ssrf.ts`) used by `POST /api/setup/validate-key` for user-supplied OpenAI-compatible base URLs: alternate IPv4 encodings (decimal `2130706433`, hex `0x7f000001`, octal `017700000001`, short `127.1`) are now canonicalized to dotted-quad before range checks; IPv4-mapped IPv6 literals (`[::ffff:127.0.0.1]`, `[::ffff:7f00:1]`) are decoded and re-checked; and the CGNAT range (100.64.0.0/10) is blocked alongside loopback/private/link-local/metadata. The provider validator (`src/server/setup/provider-validator.ts`) now sets `redirect: "manual"` so a hostile endpoint cannot 3xx-redirect the validation request to an internal host — redirects are treated as a validation failure. DNS-rebinding (TOCTOU) remains out of scope, deferred to #47/#100.
+
 ### Added
+- **Setup wizard epic #129** (minimal skeleton): first-run multi-step wizard to connect an AI provider and a Telegram bot.
+  - `ui/app/setup/page.tsx` + `ui/components/setup/`: 3-step React wizard (Welcome → AI provider → Telegram) with an accessible step indicator and progress persisted across refreshes via `localStorage` (`useSyncExternalStore`); only progress flags are persisted — never secrets (#101).
+  - `src/server/setup/provider-validator.ts` + `POST /api/setup/validate-key`: BYOK key entry for OpenAI / Anthropic / OpenAI-compatible, validated server-side against the provider's lightweight `/models` endpoint (key never leaves the local server) and stored encrypted in the vault (`0o600`); OpenAI-compatible base URLs are SSRF-guarded via `src/server/setup/ssrf.ts` (#103).
+  - `src/server/setup/telegram-verify.ts` + `POST /api/setup/telegram/verify`: Telegram bot connection (bot token + admin chat id) verified via `getMe`, followed by a one-time test message to the admin chat; token + chat id stored in the vault (#104).
+  - `GET /api/setup/status`: reports `{ complete, hasProvider, hasTelegram }`.
+  - Telegram support here is a minimal verification skeleton — full Telegram integration lands in epic #47, and the polished onboarding experience remains tracked in #100.
 - **UI shell epic #41**: Next.js 16.2 App Router shell with shadcn/Radix primitives, top navigation, dark mode, dashboard, and client data providers.
   - shadcn primitives (`button`, `card`, `dialog`, `dropdown-menu`, `input`, `label`, `tabs`, `toast` + `use-toast`/`toaster`) on Radix UI with Tailwind v4 CSS-first theming (#42).
   - `components/top-nav.tsx`: primary top navigation with route links (Inbox, Compose, Calendar, Analytics, Contacts, Settings), active-route `aria-current`, and an accessible brand link (#43).
@@ -38,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/sessions/transcript-manager.ts`: JSONL transcript ledger with `.meta.json` sidecars, path-traversal-guarded session ids, and create/list/load/append/rename/delete (#39).
   - `src/server/metrics.ts`: per-platform sent/received/failed counters emitting `update` events, broadcast over Socket.IO (#132).
   - Added `pnpm.onlyBuiltDependencies` for `better-sqlite3` so its native binding compiles on install (incl. CI).
+
+### Fixed
+- REST API now sends CORS headers scoped to the configured `server.uiOrigin`, so the browser UI (Next.js dev server on a different port) can reach the setup-wizard endpoints (`POST /api/setup/validate-key`, `POST /api/setup/telegram/verify`, `GET /api/setup/status`); previously cross-origin preflight was blocked with a missing `Access-Control-Allow-Origin` header. Hand-rolled middleware (no new dependency), single-origin only — no wildcard or arbitrary-origin reflection — matching the Socket.IO CORS posture (no credentials).
+- Added `ui/app/icon.svg` so the app serves a favicon, eliminating the `favicon.ico` 404 on every page.
 
 ### Security
 - Upgrade the `ui/` package from Next.js 14.2.35 to **16.2** (with `react`/`react-dom` pinned to identical `19.2.x`), clearing the residual high-severity Next.js advisories that required Next 15+ (content-injection / SSRF, cache-key confusion, image-optimization DoS, and middleware redirect / i18n bypass). `pnpm audit` in `ui/` now reports no high or critical findings.

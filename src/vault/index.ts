@@ -4,9 +4,11 @@ export {
   EMPTY_VAULT,
   OAuthCredentialSchema,
   ProviderCredentialSchema,
+  TelegramCredentialSchema,
   VaultSchema,
   type OAuthCredential,
   type ProviderCredential,
+  type TelegramCredential,
   type Vault
 } from "./types.js";
 export {

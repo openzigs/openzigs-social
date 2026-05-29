@@ -17,6 +17,7 @@ import {
   EMPTY_VAULT,
   type OAuthCredential,
   type ProviderCredential,
+  type TelegramCredential,
   type Vault,
   VaultSchema
 } from "./types.js";
@@ -150,13 +151,25 @@ export class CredentialVault {
     return next;
   }
 
+  /** Persist Telegram bot credentials (setup wizard, sub #104). */
+  async setTelegram(cred: TelegramCredential): Promise<void> {
+    const vault = await this.load();
+    await this.persist({ ...vault, telegram: cred });
+  }
+
+  async getTelegram(): Promise<TelegramCredential | undefined> {
+    const vault = await this.load();
+    return vault.telegram;
+  }
+
   /** Redacted JSON of vault structure — never includes secret material. */
   toString(): string {
     const v = this.cache ?? EMPTY_VAULT;
     return JSON.stringify({
       path: this.filePath,
       providers: Object.keys(v.providers),
-      oauth: Object.keys(v.oauth)
+      oauth: Object.keys(v.oauth),
+      telegram: v.telegram ? true : false
     });
   }
 }

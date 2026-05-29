@@ -86,6 +86,30 @@ describe("CredentialVault", () => {
     expect(s).not.toContain("secret-secret-secret");
   });
 
+  it("persists telegram credentials and reads them back", async () => {
+    await ctx.vault.setTelegram({ botToken: "123:ABC-tok", adminChatId: "987654" });
+    const got = await ctx.vault.getTelegram();
+    expect(got).toEqual({ botToken: "123:ABC-tok", adminChatId: "987654" });
+  });
+
+  it("getTelegram returns undefined when unset", async () => {
+    expect(await ctx.vault.getTelegram()).toBeUndefined();
+  });
+
+  it("never writes the telegram bot token in plaintext", async () => {
+    await ctx.vault.setTelegram({ botToken: "123:SUPERSECRET", adminChatId: "5" });
+    const raw = await readFile(ctx.path, "utf8");
+    expect(raw).not.toContain("SUPERSECRET");
+    expect(raw).not.toContain("botToken");
+  });
+
+  it("toString reports telegram presence without leaking the token", async () => {
+    await ctx.vault.setTelegram({ botToken: "123:LEAKME", adminChatId: "5" });
+    const s = ctx.vault.toString();
+    expect(s).toContain('"telegram":true');
+    expect(s).not.toContain("LEAKME");
+  });
+
   it("default path lives under the user home dir", () => {
     expect(defaultVaultPath()).toMatch(/\.openzigs-social\/auth\.json$/);
   });
