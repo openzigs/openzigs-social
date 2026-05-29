@@ -1,11 +1,11 @@
 # Graph Report - openzigs-social  (2026-05-29)
 
 ## Corpus Check
-- 106 files · ~27,990 words
+- 114 files · ~29,473 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 295 nodes · 369 edges · 15 communities detected
+- 317 nodes · 384 edges · 17 communities detected
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 23 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -25,18 +25,20 @@
 - [[_COMMUNITY_Community 12|Community 12]]
 - [[_COMMUNITY_Community 13|Community 13]]
 - [[_COMMUNITY_Community 14|Community 14]]
+- [[_COMMUNITY_Community 15|Community 15]]
+- [[_COMMUNITY_Community 16|Community 16]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `TranscriptManager` - 14 edges
 2. `CredentialVault` - 13 edges
 3. `startServer()` - 8 edges
 4. `resolveDataDir()` - 8 edges
-5. `Metrics` - 7 edges
-6. `loadConfig()` - 7 edges
-7. `SessionManager` - 7 edges
-8. `PrivacyController` - 6 edges
-9. `migrate()` - 5 edges
-10. `AuditLogger` - 5 edges
+5. `AppShell` - 7 edges
+6. `Metrics` - 7 edges
+7. `loadConfig()` - 7 edges
+8. `SessionManager` - 7 edges
+9. `DashboardPage` - 6 edges
+10. `PrivacyController` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `startServer()` --calls--> `createApp()`  [INFERRED]
@@ -97,18 +99,26 @@ Cohesion: 0.39
 Nodes (6): applyResolvedTheme(), applyTheme(), getStoredTheme(), getSystemTheme(), isTheme(), resolveTheme()
 
 ### Community 11 - "Community 11"
+Cohesion: 0.29
+Nodes (1): AppShell
+
+### Community 12 - "Community 12"
 Cohesion: 0.39
 Nodes (4): appliedVersions(), ensureMigrationsTable(), loadMigrations(), migrate()
 
-### Community 12 - "Community 12"
+### Community 13 - "Community 13"
+Cohesion: 0.29
+Nodes (1): DashboardPage
+
+### Community 14 - "Community 14"
 Cohesion: 0.48
 Nodes (5): addToRemoveQueue(), dispatch(), genId(), reducer(), toast()
 
-### Community 13 - "Community 13"
+### Community 15 - "Community 15"
 Cohesion: 0.33
 Nodes (1): SessionManager
 
-### Community 14 - "Community 14"
+### Community 16 - "Community 16"
 Cohesion: 0.4
 Nodes (3): generateUuid(), getClientId(), createSocket()
 
@@ -117,14 +127,18 @@ Nodes (3): generateUuid(), getClientId(), createSocket()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 7`** (12 nodes): `index.ts`, `refresh-scheduler.test.ts`, `refresh-scheduler.ts`, `RefreshRegistry`, `.get()`, `.has()`, `.register()`, `makeVault()`, `TokenRefreshScheduler`, `.constructor()`, `.markExpired()`, `.tick()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 13`** (7 nodes): `SessionManager`, `.constructor()`, `.create()`, `.delete()`, `.get()`, `.list()`, `.send()`
+- **Thin community `Community 11`** (8 nodes): `AppShell`, `.constructor()`, `.goto()`, `.navLink()`, `.openThemeMenu()`, `.selectTheme()`, `.storedTheme()`, `app-shell.page.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 13`** (7 nodes): `DashboardPage`, `.constructor()`, `.dialog()`, `.goto()`, `.kpiCard()`, `.openQuickActions()`, `dashboard.page.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 15`** (7 nodes): `SessionManager`, `.constructor()`, `.create()`, `.delete()`, `.get()`, `.list()`, `.send()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `TranscriptManager` connect `Community 5` to `Community 0`?**
-  _High betweenness centrality (0.035) - this node is a cross-community bridge._
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `startServer()` (e.g. with `bootstrap()` and `getConfig()`) actually correct?**
   _`startServer()` has 6 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
