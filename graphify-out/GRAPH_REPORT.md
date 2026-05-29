@@ -1,11 +1,11 @@
 # Graph Report - openzigs-social  (2026-05-29)
 
 ## Corpus Check
-- 136 files · ~40,190 words
+- 136 files · ~41,215 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 387 nodes · 467 edges · 21 communities detected
+- 391 nodes · 476 edges · 20 communities detected
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -30,7 +30,6 @@
 - [[_COMMUNITY_Community 17|Community 17]]
 - [[_COMMUNITY_Community 18|Community 18]]
 - [[_COMMUNITY_Community 19|Community 19]]
-- [[_COMMUNITY_Community 20|Community 20]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `CredentialVault` - 15 edges
@@ -47,40 +46,40 @@
 ## Surprising Connections (you probably didn't know these)
 - `handleVerify()` --calls--> `verifyTelegram()`  [INFERRED]
   ui/components/setup/telegram-step.tsx → src/server/setup/telegram-verify.ts
-- `startServer()` --calls--> `createSocketServer()`  [INFERRED]
-  src/server/index.ts → src/server/socket.ts
 - `bootstrap()` --calls--> `startServer()`  [INFERRED]
   src/server.ts → src/server/index.ts
 - `defaultVaultPath()` --calls--> `vaultPath()`  [INFERRED]
   src/vault/vault.ts → src/config/paths.ts
 - `startServer()` --calls--> `getConfig()`  [INFERRED]
   src/server/index.ts → src/config/index.ts
+- `startServer()` --calls--> `createApp()`  [INFERRED]
+  src/server/index.ts → src/server/app.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.1
-Nodes (3): PrivacyController, estimateTokens(), SmartRouter
+Cohesion: 0.09
+Nodes (15): auditDir(), dbPath(), defaultDataDir(), logsDir(), resolveDataDir(), sessionsDir(), userConfigPath(), vaultPath() (+7 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.13
-Nodes (6): decrypt(), deriveKey(), encrypt(), CredentialVault, defaultKeyMaterial(), defaultVaultPath()
+Cohesion: 0.1
+Nodes (9): createApp(), createCorsMiddleware(), Metrics, zero(), createSetupRouter(), listen(), mount(), handleVerify() (+1 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.1
-Nodes (9): CopilotWrapper, AnthropicProvider, CopilotProvider, createProvider(), createOllamaProvider(), pickGemma4Variant(), pickInstalledGemma4(), probeOllama() (+1 more)
+Nodes (3): PrivacyController, estimateTokens(), SmartRouter
 
 ### Community 3 - "Community 3"
-Cohesion: 0.14
-Nodes (14): auditDir(), dbPath(), defaultDataDir(), logsDir(), resolveDataDir(), sessionsDir(), userConfigPath(), vaultPath() (+6 more)
+Cohesion: 0.13
+Nodes (6): decrypt(), deriveKey(), encrypt(), CredentialVault, defaultKeyMaterial(), defaultVaultPath()
 
 ### Community 4 - "Community 4"
-Cohesion: 0.13
-Nodes (3): Metrics, zero(), createSocketServer()
+Cohesion: 0.1
+Nodes (9): CopilotWrapper, AnthropicProvider, CopilotProvider, createProvider(), createOllamaProvider(), pickGemma4Variant(), pickInstalledGemma4(), probeOllama() (+1 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.14
-Nodes (7): createApp(), createCorsMiddleware(), createSetupRouter(), listen(), mount(), handleVerify(), verifyTelegram()
+Cohesion: 0.22
+Nodes (11): buildRequest(), stripTrailingSlash(), validateProviderKey(), assertSafeUrl(), canonicalizeIpv4(), isPrivateDottedQuad(), isPrivateIpv4(), isPrivateIpv6() (+3 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.23
@@ -103,42 +102,38 @@ Cohesion: 0.2
 Nodes (1): SetupPage
 
 ### Community 11 - "Community 11"
-Cohesion: 0.26
-Nodes (7): buildRequest(), stripTrailingSlash(), validateProviderKey(), assertSafeUrl(), isPrivateIpv4(), isPrivateIpv6(), isSafeUrl()
-
-### Community 12 - "Community 12"
 Cohesion: 0.22
 Nodes (2): RefreshRegistry, TokenRefreshScheduler
 
-### Community 13 - "Community 13"
+### Community 12 - "Community 12"
 Cohesion: 0.22
 Nodes (3): Probe(), useTheme(), ThemeToggle()
 
-### Community 14 - "Community 14"
+### Community 13 - "Community 13"
 Cohesion: 0.39
 Nodes (6): applyResolvedTheme(), applyTheme(), getStoredTheme(), getSystemTheme(), isTheme(), resolveTheme()
 
-### Community 15 - "Community 15"
+### Community 14 - "Community 14"
 Cohesion: 0.29
 Nodes (1): AppShell
 
-### Community 16 - "Community 16"
+### Community 15 - "Community 15"
 Cohesion: 0.39
 Nodes (4): appliedVersions(), ensureMigrationsTable(), loadMigrations(), migrate()
 
-### Community 17 - "Community 17"
+### Community 16 - "Community 16"
 Cohesion: 0.29
 Nodes (1): DashboardPage
 
-### Community 18 - "Community 18"
+### Community 17 - "Community 17"
 Cohesion: 0.48
 Nodes (5): addToRemoveQueue(), dispatch(), genId(), reducer(), toast()
 
-### Community 19 - "Community 19"
+### Community 18 - "Community 18"
 Cohesion: 0.33
 Nodes (1): SessionManager
 
-### Community 20 - "Community 20"
+### Community 19 - "Community 19"
 Cohesion: 0.4
 Nodes (3): generateUuid(), getClientId(), createSocket()
 
@@ -147,29 +142,29 @@ Nodes (3): generateUuid(), getClientId(), createSocket()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 10`** (12 nodes): `SetupPage`, `.advanceFromWelcome()`, `.completeProviderStep()`, `.constructor()`, `.goto()`, `.providerRadio()`, `.selectProvider()`, `.stepTitle()`, `.stubStatus()`, `.stubTelegramVerify()`, `.stubValidateKey()`, `setup.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 12`** (11 nodes): `refresh-scheduler.test.ts`, `refresh-scheduler.ts`, `RefreshRegistry`, `.get()`, `.has()`, `.register()`, `makeVault()`, `TokenRefreshScheduler`, `.constructor()`, `.markExpired()`, `.tick()`
+- **Thin community `Community 11`** (11 nodes): `refresh-scheduler.test.ts`, `refresh-scheduler.ts`, `RefreshRegistry`, `.get()`, `.has()`, `.register()`, `makeVault()`, `TokenRefreshScheduler`, `.constructor()`, `.markExpired()`, `.tick()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 15`** (8 nodes): `AppShell`, `.constructor()`, `.goto()`, `.navLink()`, `.openThemeMenu()`, `.selectTheme()`, `.storedTheme()`, `app-shell.page.ts`
+- **Thin community `Community 14`** (8 nodes): `AppShell`, `.constructor()`, `.goto()`, `.navLink()`, `.openThemeMenu()`, `.selectTheme()`, `.storedTheme()`, `app-shell.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 17`** (7 nodes): `DashboardPage`, `.constructor()`, `.dialog()`, `.goto()`, `.kpiCard()`, `.openQuickActions()`, `dashboard.page.ts`
+- **Thin community `Community 16`** (7 nodes): `DashboardPage`, `.constructor()`, `.dialog()`, `.goto()`, `.kpiCard()`, `.openQuickActions()`, `dashboard.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 19`** (7 nodes): `SessionManager`, `.constructor()`, `.create()`, `.delete()`, `.get()`, `.list()`, `.send()`
+- **Thin community `Community 18`** (7 nodes): `SessionManager`, `.constructor()`, `.create()`, `.delete()`, `.get()`, `.list()`, `.send()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `TranscriptManager` connect `Community 8` to `Community 3`, `Community 4`?**
+- **Why does `TranscriptManager` connect `Community 8` to `Community 0`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `startServer()` (e.g. with `bootstrap()` and `getConfig()`) actually correct?**
   _`startServer()` has 6 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.1 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.13 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
   _Cohesion score 0.1 - nodes in this community are weakly interconnected._
 - **Should `Community 3` be split into smaller, more focused modules?**
-  _Cohesion score 0.14 - nodes in this community are weakly interconnected._
-- **Should `Community 4` be split into smaller, more focused modules?**
   _Cohesion score 0.13 - nodes in this community are weakly interconnected._
+- **Should `Community 4` be split into smaller, more focused modules?**
+  _Cohesion score 0.1 - nodes in this community are weakly interconnected._
