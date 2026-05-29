@@ -50,6 +50,61 @@ encryption with a key derived from your machine identifier. All API keys,
 OAuth refresh tokens, and per-provider settings live there — nothing is
 ever written to disk in plaintext.
 
+## 12. Where is my data, and how do I configure it?
+
+Everything openzigs-social writes lives under a single data directory:
+
+* **Default:** `~/.openzigs-social/`
+* **Override:** set the `OPENZIGS_SOCIAL_HOME` environment variable to point
+  somewhere else (the sandboxed macOS app uses this automatically).
+
+That directory holds the SQLite database (`openzigs-social.db`), the
+credential vault (`auth.json`), your config overlay (`user.json`), rotating
+logs (`logs/`), the audit log (`audit/audit.jsonl`), and chat transcripts
+(`sessions/`).
+
+Configuration is layered, with each layer overriding the one before it:
+
+1. Built-in defaults (`config/default.json`)
+2. Your overlay at `<dataDir>/user.json`
+3. Environment variables
+
+Supported environment overrides:
+
+| Variable | Setting | Example |
+|---|---|---|
+| `OPENZIGS_SOCIAL_SERVER_HOST` | Bind address | `127.0.0.1` |
+| `OPENZIGS_SOCIAL_SERVER_PORT` | HTTP/Socket.IO port (`0` = OS-assigned) | `3000` |
+| `OPENZIGS_SOCIAL_UI_ORIGIN` | Allowed UI origin (CORS) | `http://localhost:3001` |
+| `OPENZIGS_SOCIAL_LOG_LEVEL` | `error` / `warn` / `info` / `debug` | `info` |
+| `OPENZIGS_SOCIAL_LOG_TO_FILE` | Write rotating log files | `true` / `false` |
+| `OPENZIGS_SOCIAL_PRIVACY_MODE` | `off` / `session` / `global` | `session` |
+
+### HTTP endpoints
+
+The server exposes a few operational endpoints (bound to
+`OPENZIGS_SOCIAL_SERVER_HOST:PORT`):
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness — `200` with `{ status, uptimeMs }`. |
+| `GET /ready` | Readiness — `200`/`503` with per-dependency `checks`. |
+| `GET /api/metrics` | Per-platform counters as a flat JSON envelope. |
+
+`GET /api/metrics` returns JSON (not Prometheus plain-text):
+
+```json
+{
+  "timestamp": "2026-05-29T00:00:00.000Z",
+  "metrics": {
+    "twitter": { "sent": 3, "received": 12, "failed": 0 }
+  }
+}
+```
+
+The same `metrics` snapshot is pushed to connected UIs over Socket.IO as a
+`metrics:update` event whenever a counter changes.
+
 ## 11. Troubleshooting
 
 ### "Ollama unreachable" warning on launch

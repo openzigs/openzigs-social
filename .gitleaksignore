@@ -1,0 +1,5 @@
+# gitleaks false-positive allowlist (fingerprints).
+# Synthetic, non-functional test fixture used to verify the secret-scrubber in
+# src/logging/redact.ts. Not a real credential. Introduced in commit 8f849fd and
+# later rewritten to a low-entropy form, but remains in branch history.
+8f849fd847032f410935d27efd175f62f5514aef:src/logging/redact.test.ts:generic-api-key:68
