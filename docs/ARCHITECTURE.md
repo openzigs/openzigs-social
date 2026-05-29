@@ -37,7 +37,7 @@ _To be written._
 | Agent runtime | @github/copilot-sdk | ^0.3.0 |
 | Default local LLM | Ollama / Gemma 4 | — |
 | Telegram channel | grammy + @grammyjs/menu | 1.40 |
-| UI framework | Next.js (App Router) | 14.2 |
+| UI framework | Next.js (App Router) | 16.2 |
 | UI library | React | 19 |
 | Styling | Tailwind CSS | 4.3 |
 | UI primitives | Radix UI / shadcn | latest |
@@ -93,7 +93,32 @@ Layout under the data directory:
 
 ## 5. UI map (`ui/`)
 
-_To be written._
+The desktop UI is a **Next.js 16.2** App Router app (`ui/`) styled with
+Tailwind v4 (CSS-first `@theme`) and built from Radix UI / shadcn primitives.
+It runs on port `3001` in development and talks to the Node server (port
+`3000`) over REST + Socket.IO.
+
+| Path | Responsibility |
+|---|---|
+| `app/layout.tsx` | Root layout; injects the no-FOUC theme script and wraps the tree in `Providers` + `TopNav` |
+| `app/providers.tsx` | Client providers: TanStack Query, `ThemeProvider`, the Socket.IO client, and the toast `Toaster`; exposes `useSocket()` |
+| `app/page.tsx` | Dashboard shell — KPI card grid + quick-actions dialog |
+| `app/{inbox,compose,calendar,analytics,contacts,settings}/page.tsx` | Route placeholders for the primary nav destinations |
+| `components/top-nav.tsx` | Primary top navigation (active-route `aria-current`) + theme toggle |
+| `components/theme-provider.tsx` | Theme context backed by `useSyncExternalStore`; `localStorage` persistence + system-scheme tracking |
+| `components/theme-toggle.tsx` | System/light/dark dropdown toggle |
+| `components/kpi-card.tsx` / `components/dashboard-dialog.tsx` | Dashboard building blocks |
+| `components/ui/` | shadcn primitives (button, card, dialog, dropdown-menu, input, label, tabs, toast) |
+| `lib/theme.ts` | Theme resolution + DOM application via `document.startViewTransition` (React 19.2 View Transitions) |
+| `lib/socket.ts` | `createSocket()` — Socket.IO client sending the persisted `clientId` in the handshake auth; persists the server-assigned session id on `session:restored` |
+| `lib/client-id.ts` | Stable client id generation/persistence (`localStorage`, UUID v4) |
+| `lib/query-client.ts` | TanStack Query client factory |
+| `lib/nav.ts` | Declarative nav route table + active-route helper |
+
+The client-id contract mirrors the server: on connect the socket sends
+`auth.clientId` (restored from `localStorage`), and the server replies with
+`session:restored` carrying the canonical `sessionId`, which the client
+persists back to `localStorage` so sessions survive reloads.
 
 ## 6. Data model (SQLite)
 
