@@ -1,11 +1,11 @@
 # Graph Report - openzigs-social  (2026-05-29)
 
 ## Corpus Check
-- 134 files · ~38,110 words
+- 136 files · ~39,471 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 372 nodes · 451 edges · 20 communities detected
+- 385 nodes · 464 edges · 20 communities detected
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -34,14 +34,14 @@
 ## God Nodes (most connected - your core abstractions)
 1. `CredentialVault` - 15 edges
 2. `TranscriptManager` - 14 edges
-3. `startServer()` - 8 edges
-4. `resolveDataDir()` - 8 edges
-5. `AppShell` - 7 edges
-6. `Metrics` - 7 edges
-7. `loadConfig()` - 7 edges
-8. `SessionManager` - 7 edges
-9. `DashboardPage` - 6 edges
-10. `PrivacyController` - 6 edges
+3. `SetupPage` - 11 edges
+4. `startServer()` - 8 edges
+5. `resolveDataDir()` - 8 edges
+6. `AppShell` - 7 edges
+7. `Metrics` - 7 edges
+8. `loadConfig()` - 7 edges
+9. `SessionManager` - 7 edges
+10. `DashboardPage` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `handleVerify()` --calls--> `verifyTelegram()`  [INFERRED]
@@ -50,16 +50,16 @@
   src/server.ts → src/server/index.ts
 - `defaultVaultPath()` --calls--> `vaultPath()`  [INFERRED]
   src/vault/vault.ts → src/config/paths.ts
-- `startServer()` --calls--> `getConfig()`  [INFERRED]
-  src/server/index.ts → src/config/index.ts
-- `startServer()` --calls--> `createLogger()`  [INFERRED]
-  src/server/index.ts → src/logging/logger.ts
+- `startServer()` --calls--> `createApp()`  [INFERRED]
+  src/server/index.ts → src/server/app.ts
+- `startServer()` --calls--> `createSocketServer()`  [INFERRED]
+  src/server/index.ts → src/server/socket.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.08
-Nodes (10): createApp(), buildReadinessCheck(), startServer(), Metrics, zero(), createSocketServer(), createSetupRouter(), listen() (+2 more)
+Cohesion: 0.07
+Nodes (24): deepMerge(), defaultConfigPath(), envLayer(), getConfig(), isObject(), loadConfig(), readJsonIfPresent(), setPath() (+16 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.1
@@ -74,8 +74,8 @@ Cohesion: 0.1
 Nodes (9): CopilotWrapper, AnthropicProvider, CopilotProvider, createProvider(), createOllamaProvider(), pickGemma4Variant(), pickInstalledGemma4(), probeOllama() (+1 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.16
-Nodes (11): auditDir(), dbPath(), defaultDataDir(), logsDir(), resolveDataDir(), sessionsDir(), userConfigPath(), vaultPath() (+3 more)
+Cohesion: 0.15
+Nodes (6): createApp(), createSetupRouter(), listen(), mount(), handleVerify(), verifyTelegram()
 
 ### Community 5 - "Community 5"
 Cohesion: 0.23
@@ -86,12 +86,12 @@ Cohesion: 0.33
 Nodes (1): TranscriptManager
 
 ### Community 7 - "Community 7"
-Cohesion: 0.26
-Nodes (8): deepMerge(), defaultConfigPath(), envLayer(), getConfig(), isObject(), loadConfig(), readJsonIfPresent(), setPath()
-
-### Community 8 - "Community 8"
 Cohesion: 0.21
 Nodes (5): AuditLogger, isSensitiveKey(), redact(), redactInner(), scrubSecretsInString()
+
+### Community 8 - "Community 8"
+Cohesion: 0.2
+Nodes (1): SetupPage
 
 ### Community 9 - "Community 9"
 Cohesion: 0.26
@@ -126,19 +126,21 @@ Cohesion: 0.48
 Nodes (5): addToRemoveQueue(), dispatch(), genId(), reducer(), toast()
 
 ### Community 17 - "Community 17"
+Cohesion: 0.48
+Nodes (1): Metrics
+
+### Community 18 - "Community 18"
 Cohesion: 0.33
 Nodes (1): SessionManager
 
-### Community 18 - "Community 18"
+### Community 19 - "Community 19"
 Cohesion: 0.4
 Nodes (3): generateUuid(), getClientId(), createSocket()
 
-### Community 19 - "Community 19"
-Cohesion: 0.33
-Nodes (2): handleVerify(), verifyTelegram()
-
 ## Knowledge Gaps
 - **Thin community `Community 6`** (13 nodes): `TranscriptManager`, `.append()`, `.assertId()`, `.create()`, `.delete()`, `.enqueue()`, `.ledgerPath()`, `.list()`, `.load()`, `.metaPath()`, `.readMeta()`, `.renameId()`, `.renameTitle()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 8`** (12 nodes): `SetupPage`, `.advanceFromWelcome()`, `.completeProviderStep()`, `.constructor()`, `.goto()`, `.providerRadio()`, `.selectProvider()`, `.stepTitle()`, `.stubStatus()`, `.stubTelegramVerify()`, `.stubValidateKey()`, `setup.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 10`** (11 nodes): `refresh-scheduler.test.ts`, `refresh-scheduler.ts`, `RefreshRegistry`, `.get()`, `.has()`, `.register()`, `makeVault()`, `TokenRefreshScheduler`, `.constructor()`, `.markExpired()`, `.tick()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -146,20 +148,22 @@ Nodes (2): handleVerify(), verifyTelegram()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 15`** (7 nodes): `DashboardPage`, `.constructor()`, `.dialog()`, `.goto()`, `.kpiCard()`, `.openQuickActions()`, `dashboard.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 17`** (7 nodes): `SessionManager`, `.constructor()`, `.create()`, `.delete()`, `.get()`, `.list()`, `.send()`
+- **Thin community `Community 17`** (7 nodes): `Metrics`, `.increment()`, `.recordFailed()`, `.recordReceived()`, `.recordSent()`, `.reset()`, `.snapshot()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 19`** (6 nodes): `handleVerify()`, `stubFetch()`, `verifyTelegram()`, `telegram-verify.test.ts`, `telegram-verify.ts`, `telegram-step.tsx`
+- **Thin community `Community 18`** (7 nodes): `SessionManager`, `.constructor()`, `.create()`, `.delete()`, `.get()`, `.list()`, `.send()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `TranscriptManager` connect `Community 6` to `Community 0`, `Community 4`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+- **Why does `TranscriptManager` connect `Community 6` to `Community 0`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `Metrics` connect `Community 17` to `Community 0`?**
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `startServer()` (e.g. with `bootstrap()` and `getConfig()`) actually correct?**
   _`startServer()` has 6 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.08 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.1 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
