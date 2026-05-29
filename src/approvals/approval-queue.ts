@@ -78,6 +78,29 @@ export interface ApprovalQueueOptions {
   defaultTimeoutMs?: number;
   /** Override the clock (tests). */
   now?: () => number;
+  /**
+   * Maximum number of simultaneously pending requests. Omit for unbounded
+   * (the default). When set, a {@link ApprovalQueue.request} that would exceed
+   * this cap throws {@link ApprovalQueueFullError} synchronously (fail-fast
+   * backpressure) rather than creating a dangling promise.
+   */
+  maxPending?: number;
+}
+
+/**
+ * Thrown synchronously by {@link ApprovalQueue.request} when the queue is
+ * already at its configured `maxPending` capacity. Surfacing this as a throw
+ * (rather than resolving `{ decision: "timeout" }`) keeps backpressure visible
+ * to the caller instead of silently hiding it.
+ */
+export class ApprovalQueueFullError extends Error {
+  /** The configured cap that was hit. */
+  readonly maxPending: number;
+  constructor(maxPending: number) {
+    super(`approval queue is full (maxPending=${maxPending})`);
+    this.name = "ApprovalQueueFullError";
+    this.maxPending = maxPending;
+  }
 }
 
 /** Typed event map emitted by {@link ApprovalQueue}. */
@@ -106,6 +129,7 @@ interface Entry<P> {
 export class ApprovalQueue<P = unknown> extends EventEmitter {
   private readonly entries = new Map<string, Entry<P>>();
   private readonly defaultTimeoutMs?: number;
+  private readonly maxPending?: number;
   private readonly now: () => number;
 
   constructor(opts: ApprovalQueueOptions = {}) {
@@ -113,18 +137,33 @@ export class ApprovalQueue<P = unknown> extends EventEmitter {
     if (opts.defaultTimeoutMs !== undefined) {
       this.defaultTimeoutMs = requestOptionsSchema.shape.timeoutMs.parse(opts.defaultTimeoutMs);
     }
+    if (opts.maxPending !== undefined) {
+      this.maxPending = z.number().int().positive().parse(opts.maxPending);
+    }
     this.now = opts.now ?? Date.now;
   }
 
   /**
-   * Register an approval request. Resolves with the decision (or a timeout
-   * outcome). Never rejects.
+   * Register an approval request.
+   *
+   * The returned Promise **never rejects**: it resolves with the decision, or
+   * with `{ decision: "timeout" }` when the timeout elapses, so callers can
+   * `await` without a try/catch.
+   *
+   * `request()` itself can, however, **throw synchronously** — before any
+   * Promise is created — when: the options fail Zod validation, `opts.id`
+   * duplicates an already-pending request, or the queue is at its configured
+   * `maxPending` capacity (throws {@link ApprovalQueueFullError}). Guard those
+   * call sites with try/catch if any apply.
    */
   request(payload: P, opts: RequestOptions = {}): Promise<ApprovalOutcome> {
     const parsed = requestOptionsSchema.parse(opts);
     const id = parsed.id ?? randomUUID();
     if (this.entries.has(id)) {
       throw new Error(`approval request already pending: ${id}`);
+    }
+    if (this.maxPending !== undefined && this.entries.size >= this.maxPending) {
+      throw new ApprovalQueueFullError(this.maxPending);
     }
     const timeoutMs = parsed.timeoutMs ?? this.defaultTimeoutMs;
 

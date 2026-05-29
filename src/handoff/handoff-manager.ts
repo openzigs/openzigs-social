@@ -92,11 +92,26 @@ export class HandoffManager extends EventEmitter {
     }
     set.add(controller);
 
-    const unregister = (): void => {
+    const prune = (): void => {
       const current = this.controllers.get(threadId);
       if (!current) return;
       current.delete(controller);
       if (current.size === 0) this.controllers.delete(threadId);
+    };
+
+    // Self-healing: if the consumer aborts the controller for *any* reason
+    // other than takeOver (e.g. normal completion or cancellation) and forgets
+    // to call `unregister`, auto-prune it so it never leaks. This emits no
+    // ownership change — it only frees the slot. `{ once: true }` removes the
+    // listener after it fires; `unregister` removes it explicitly otherwise.
+    const onAbort = (): void => {
+      prune();
+    };
+    controller.signal.addEventListener("abort", onAbort, { once: true });
+
+    const unregister = (): void => {
+      controller.signal.removeEventListener("abort", onAbort);
+      prune();
     };
 
     return { controller, unregister };
@@ -141,10 +156,21 @@ export class HandoffManager extends EventEmitter {
     return Array.from(this.humanOwned, (threadId) => ({ threadId, owner: "human" as const }));
   }
 
+  /**
+   * Number of in-flight draft controllers currently registered for a thread
+   * (mostly for tests / observability). Aborted controllers are auto-pruned,
+   * so this reflects only controllers still considered in-flight.
+   */
+  registeredCount(threadId: string): number {
+    return this.controllers.get(threadId)?.size ?? 0;
+  }
+
   private abortAll(threadId: string): void {
     const set = this.controllers.get(threadId);
     if (!set) return;
-    for (const controller of set) {
+    // Snapshot before iterating: aborting each controller synchronously fires
+    // its auto-prune `abort` listener, which mutates this same set.
+    for (const controller of Array.from(set)) {
       if (!controller.signal.aborted) controller.abort();
     }
     this.controllers.delete(threadId);

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApprovalQueue, type ApprovalOutcome, type PendingApproval } from "./approval-queue.js";
+import {
+  ApprovalQueue,
+  ApprovalQueueFullError,
+  type ApprovalOutcome,
+  type PendingApproval
+} from "./approval-queue.js";
 
 interface DraftPayload {
   threadId: string;
@@ -191,5 +196,65 @@ describe("ApprovalQueue", () => {
     t = 2000;
     queue.decide(queue.list()[0]!.id, "approve");
     expect((await promise).decidedAt).toBe(2000);
+  });
+
+  describe("maxPending cap", () => {
+    it("throws ApprovalQueueFullError synchronously when at capacity", () => {
+      const queue = new ApprovalQueue({ maxPending: 2 });
+      void queue.request({}, { id: "a" });
+      void queue.request({}, { id: "b" });
+      expect(queue.size).toBe(2);
+
+      expect(() => queue.request({}, { id: "c" })).toThrow(ApprovalQueueFullError);
+      try {
+        queue.request({}, { id: "c" });
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApprovalQueueFullError);
+        expect((err as ApprovalQueueFullError).maxPending).toBe(2);
+        expect((err as Error).message).toMatch(/full/);
+      }
+      // The rejected request created no entry — no dangling promise / slot.
+      expect(queue.size).toBe(2);
+      expect(queue.has("c")).toBe(false);
+    });
+
+    it("accepts a new request again after a pending one is decided (slot freed)", async () => {
+      const queue = new ApprovalQueue({ maxPending: 1 });
+      const first = queue.request({}, { id: "a" });
+      expect(() => queue.request({}, { id: "b" })).toThrow(ApprovalQueueFullError);
+
+      queue.decide("a", "approve");
+      expect((await first).decision).toBe("approve");
+
+      // Slot freed → next request succeeds.
+      expect(() => queue.request({}, { id: "b" })).not.toThrow();
+      expect(queue.has("b")).toBe(true);
+    });
+
+    it("frees a slot when a pending request times out", async () => {
+      const queue = new ApprovalQueue({ maxPending: 1 });
+      const first = queue.request({}, { id: "a", timeoutMs: 1000 });
+      expect(() => queue.request({}, { id: "b" })).toThrow(ApprovalQueueFullError);
+
+      vi.advanceTimersByTime(1000);
+      expect((await first).decision).toBe("timeout");
+
+      expect(() => queue.request({}, { id: "b" })).not.toThrow();
+      expect(queue.size).toBe(1);
+    });
+
+    it("is unbounded by default (existing behavior unchanged)", () => {
+      const queue = new ApprovalQueue();
+      for (let i = 0; i < 50; i++) void queue.request({}, { id: `r${i}` });
+      expect(queue.size).toBe(50);
+      expect(() => queue.request({}, { id: "r50" })).not.toThrow();
+      expect(queue.size).toBe(51);
+    });
+
+    it("validates maxPending at construction", () => {
+      expect(() => new ApprovalQueue({ maxPending: 0 })).toThrow();
+      expect(() => new ApprovalQueue({ maxPending: -1 })).toThrow();
+      expect(() => new ApprovalQueue({ maxPending: 1.5 })).toThrow();
+    });
   });
 });

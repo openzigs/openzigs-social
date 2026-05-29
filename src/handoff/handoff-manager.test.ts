@@ -138,4 +138,61 @@ describe("HandoffManager", () => {
     // @ts-expect-error invalid type
     expect(() => handoff.register(123)).toThrow(/non-empty string/);
   });
+
+  describe("auto-prune on abort", () => {
+    it("auto-removes a controller aborted directly (not via takeOver) and emits no ownership change", () => {
+      const handoff = new HandoffManager();
+      const onChange = vi.fn();
+      handoff.on("ownership.change", onChange);
+
+      const { controller } = handoff.register("t1");
+      expect(handoff.registeredCount("t1")).toBe(1);
+
+      controller.abort();
+
+      expect(handoff.registeredCount("t1")).toBe(0);
+      expect(handoff.owner("t1")).toBe("ai");
+      expect(handoff.isHumanOwned("t1")).toBe(false);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(handoff.list()).toEqual([]);
+    });
+
+    it("prunes only the aborted controller, leaving siblings registered", () => {
+      const handoff = new HandoffManager();
+      const a = handoff.register("t1").controller;
+      handoff.register("t1");
+      expect(handoff.registeredCount("t1")).toBe(2);
+
+      a.abort();
+      expect(handoff.registeredCount("t1")).toBe(1);
+    });
+
+    it("takeOver still emits exactly one ownership event despite auto-prune listeners", () => {
+      const handoff = new HandoffManager();
+      const onChange = vi.fn();
+      handoff.on("ownership.change", onChange);
+
+      handoff.register("t1");
+      handoff.register("t1");
+      handoff.register("t1");
+
+      handoff.takeOver("t1");
+
+      expect(onChange).toHaveBeenCalledOnce();
+      expect(handoff.isHumanOwned("t1")).toBe(true);
+      // All controllers pruned, no double-prune errors / dangling sets.
+      expect(handoff.registeredCount("t1")).toBe(0);
+    });
+
+    it("unregister then abort is a no-op (no double-prune)", () => {
+      const handoff = new HandoffManager();
+      const { controller, unregister } = handoff.register("t1");
+      unregister();
+      expect(handoff.registeredCount("t1")).toBe(0);
+
+      // Aborting after unregister must not throw or resurrect state.
+      expect(() => controller.abort()).not.toThrow();
+      expect(handoff.registeredCount("t1")).toBe(0);
+    });
+  });
 });

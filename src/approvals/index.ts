@@ -1,5 +1,6 @@
 export {
   ApprovalQueue,
+  ApprovalQueueFullError,
   type ApprovalOutcome,
   type ApprovalQueueEvents,
   type ApprovalQueueOptions,
