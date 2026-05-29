@@ -77,13 +77,13 @@ importers:
     dependencies:
       next:
         specifier: 14.2.18
-        version: 14.2.18(react-dom@19.2.6(react@19.0.0))(react@19.0.0)
+        version: 14.2.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react:
-        specifier: 19.0.0
-        version: 19.0.0
+        specifier: 19.2.6
+        version: 19.2.6
       react-dom:
         specifier: 19.2.6
-        version: 19.2.6(react@19.0.0)
+        version: 19.2.6(react@19.2.6)
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0
@@ -2642,8 +2642,8 @@ packages:
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
-  react@19.0.0:
-    resolution: {integrity: sha512-V8AVnmPIICiWpGfm6GLzCR/W5FXLchHop40W4nXBmdlEceh16rCN8O8LNWm5bh5XUX91fh7KpA+W0TgMKmgTpQ==}
+  react@19.2.6:
+    resolution: {integrity: sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==}
     engines: {node: '>=0.10.0'}
 
   readable-stream@3.6.2:
@@ -5543,7 +5543,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next@14.2.18(react-dom@19.2.6(react@19.0.0))(react@19.0.0):
+  next@14.2.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
       '@next/env': 14.2.18
       '@swc/helpers': 0.5.5
@@ -5551,9 +5551,9 @@ snapshots:
       caniuse-lite: 1.0.30001793
       graceful-fs: 4.2.11
       postcss: 8.4.31
-      react: 19.0.0
-      react-dom: 19.2.6(react@19.0.0)
-      styled-jsx: 5.1.1(react@19.0.0)
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+      styled-jsx: 5.1.1(react@19.2.6)
     optionalDependencies:
       '@next/swc-darwin-arm64': 14.2.18
       '@next/swc-darwin-x64': 14.2.18
@@ -5768,14 +5768,14 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
-  react-dom@19.2.6(react@19.0.0):
+  react-dom@19.2.6(react@19.2.6):
     dependencies:
-      react: 19.0.0
+      react: 19.2.6
       scheduler: 0.27.0
 
   react-is@16.13.1: {}
 
-  react@19.0.0: {}
+  react@19.2.6: {}
 
   readable-stream@3.6.2:
     dependencies:
@@ -6122,10 +6122,10 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  styled-jsx@5.1.1(react@19.0.0):
+  styled-jsx@5.1.1(react@19.2.6):
     dependencies:
       client-only: 0.0.1
-      react: 19.0.0
+      react: 19.2.6
 
   supports-color@7.2.0:
     dependencies:
