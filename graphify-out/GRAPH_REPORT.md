@@ -1,7 +1,7 @@
 # Graph Report - openzigs-social  (2026-05-29)
 
 ## Corpus Check
-- 38 files · ~11,142 words
+- 38 files · ~11,187 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
