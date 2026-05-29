@@ -2,10 +2,12 @@ export { CredentialVault, defaultVaultPath, VAULT_DIR_MODE, VAULT_FILE_MODE } fr
 export type { VaultOptions } from "./vault.js";
 export {
   EMPTY_VAULT,
+  MetaAppCredentialSchema,
   OAuthCredentialSchema,
   ProviderCredentialSchema,
   TelegramCredentialSchema,
   VaultSchema,
+  type MetaAppCredential,
   type OAuthCredential,
   type ProviderCredential,
   type TelegramCredential,

@@ -37,18 +37,33 @@ export const TelegramCredentialSchema = z
   })
   .strict();
 
+/**
+ * Meta app credentials for Cohort A connectors (epic #53). The app id is not
+ * strictly secret but the app secret is — both live encrypted in the vault so
+ * the OAuth code-exchange (Instagram/Facebook/Threads) can sign requests at
+ * runtime. They are never logged nor echoed in API responses.
+ */
+export const MetaAppCredentialSchema = z
+  .object({
+    appId: z.string().min(1),
+    appSecret: z.string().min(1)
+  })
+  .strict();
+
 export const VaultSchema = z
   .object({
     version: z.literal(1).default(1),
     providers: z.record(z.string(), ProviderCredentialSchema).default({}),
     oauth: z.record(z.string(), OAuthCredentialSchema).default({}),
-    telegram: TelegramCredentialSchema.optional()
+    telegram: TelegramCredentialSchema.optional(),
+    meta: MetaAppCredentialSchema.optional()
   })
   .strict();
 
 export type ProviderCredential = z.infer<typeof ProviderCredentialSchema>;
 export type OAuthCredential = z.infer<typeof OAuthCredentialSchema>;
 export type TelegramCredential = z.infer<typeof TelegramCredentialSchema>;
+export type MetaAppCredential = z.infer<typeof MetaAppCredentialSchema>;
 export type Vault = z.infer<typeof VaultSchema>;
 
 export const EMPTY_VAULT: Vault = { version: 1, providers: {}, oauth: {} };

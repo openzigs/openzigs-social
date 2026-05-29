@@ -21,6 +21,7 @@ import helmet from "helmet";
 import type { CredentialVault } from "../vault/index.js";
 import type { Metrics } from "./metrics.js";
 import { createSetupRouter, type SetupRouterDeps } from "./setup/router.js";
+import { createConnectionsRouter } from "./connections/router.js";
 
 export interface ReadinessReport {
   db: boolean;
@@ -144,6 +145,7 @@ export function createApp(deps: AppDeps): Express {
   });
   if (deps.vault) {
     api.use("/setup", createSetupRouter({ vault: deps.vault, ...deps.setup }));
+    api.use("/connections", createConnectionsRouter({ vault: deps.vault }));
   }
   app.use("/api", api);
 

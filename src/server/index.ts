@@ -27,9 +27,12 @@ import {
   SocialDmSenderRegistry,
   WebhookEventStore,
   WebhookHandlerRegistry,
+  RateLimitBroker,
+  DlqRepository,
   createOAuthRouter,
   createWebhookRouter
 } from "../platform/index.js";
+import { registerMetaConnectors } from "../connectors/meta/index.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
@@ -105,6 +108,39 @@ export async function startServer(): Promise<StartedServer> {
     warn: (obj: unknown, msg?: string) => logger.warn(msg ?? "", obj),
     error: (obj: unknown, msg?: string) => logger.error(msg ?? "", obj)
   };
+
+  // Meta (Cohort A) connectors (#53) — opt-in. Registers OAuth exchangers,
+  // webhook handlers, and the IG DM sender into the platform registries; one
+  // shared rate-limit budget governs IG/FB/Threads. App creds/tokens are read
+  // from the vault (BYOK) and never logged.
+  if (config.platform.meta.enabled) {
+    const broker = new RateLimitBroker({
+      budgets: {
+        meta: {
+          capacity: config.platform.meta.budget.requests,
+          refillPerSec:
+            config.platform.meta.budget.requests / (config.platform.meta.budget.windowMs / 1000)
+        }
+      }
+    });
+    try {
+      await registerMetaConnectors({
+        config: {
+          graphBaseUrl: config.platform.meta.graphBaseUrl,
+          threadsBaseUrl: config.platform.meta.threadsBaseUrl,
+          oauthCallbackBaseUrl: `http://${config.server.host}:${config.server.port}`
+        },
+        registries: platform,
+        vault,
+        broker,
+        dlq: new DlqRepository(db)
+      });
+    } catch (err) {
+      logger.error("meta.register_failed", {
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
 
   // OAuth callback router (#139) — opt-in.
   const oauthRouter = config.platform.oauth.enabled

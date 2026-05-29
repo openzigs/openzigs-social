@@ -15,6 +15,7 @@ import { vaultPath } from "../config/paths.js";
 import { decrypt, deriveKey, encrypt, type Envelope } from "./crypto.js";
 import {
   EMPTY_VAULT,
+  type MetaAppCredential,
   type OAuthCredential,
   type ProviderCredential,
   type TelegramCredential,
@@ -162,6 +163,17 @@ export class CredentialVault {
     return vault.telegram;
   }
 
+  /** Persist Meta app credentials for Cohort A connectors (epic #53). */
+  async setMeta(cred: MetaAppCredential): Promise<void> {
+    const vault = await this.load();
+    await this.persist({ ...vault, meta: cred });
+  }
+
+  async getMeta(): Promise<MetaAppCredential | undefined> {
+    const vault = await this.load();
+    return vault.meta;
+  }
+
   /** Redacted JSON of vault structure — never includes secret material. */
   toString(): string {
     const v = this.cache ?? EMPTY_VAULT;
@@ -169,7 +181,8 @@ export class CredentialVault {
       path: this.filePath,
       providers: Object.keys(v.providers),
       oauth: Object.keys(v.oauth),
-      telegram: v.telegram ? true : false
+      telegram: v.telegram ? true : false,
+      meta: v.meta ? true : false
     });
   }
 }
