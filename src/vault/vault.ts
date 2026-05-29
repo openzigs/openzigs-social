@@ -8,9 +8,10 @@
  */
 import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { homedir, hostname, platform, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { hostname, platform, userInfo } from "node:os";
+import { dirname } from "node:path";
 
+import { vaultPath } from "../config/paths.js";
 import { decrypt, deriveKey, encrypt, type Envelope } from "./crypto.js";
 import {
   EMPTY_VAULT,
@@ -35,7 +36,7 @@ export interface VaultOptions {
 }
 
 export function defaultVaultPath(): string {
-  return join(homedir(), ".openzigs-social", "auth.json");
+  return vaultPath();
 }
 
 function defaultKeyMaterial(): string {
