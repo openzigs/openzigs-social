@@ -90,6 +90,8 @@ Layout under the data directory:
 | `server/index.ts` | Composition root: wires config/logger/db/sessions/server |
 | `copilot/` | Copilot SDK wrapper, providers, smart router, privacy (epic #28) |
 | `vault/` | Encrypted credential vault + OAuth refresh scheduler (epic #28) |
+| `approvals/approval-queue.ts` | `ApprovalQueue` — awaitable-Promise + EventEmitter approval primitive (epic #128) |
+| `handoff/handoff-manager.ts` | `HandoffManager` — per-thread AI↔human ownership + draft cancellation (epic #128) |
 
 ## 5. UI map (`ui/`)
 
@@ -179,6 +181,44 @@ our wrapper surface:
 
 Session, streaming, and tool-call surfaces (`CopilotSession.on(...)`,
 `session.sendAndWait(...)`, `session.disconnect()`) are unchanged.
+
+## 12. Approval queue + handoff primitives (#128)
+
+Two small, in-memory, framework-agnostic primitives shared by every surface
+that needs human-in-the-loop control. They have no UI of their own and no DB
+layer — consuming surfaces (#47 Telegram, #71 inbox, #78 auto-reply, #84
+outbox, the DM dispatcher) restore their own context and re-issue requests on
+restart. Both expose `list()` for snapshotting.
+
+### `ApprovalQueue` (`src/approvals/approval-queue.ts`, #49)
+
+EventEmitter-based, awaitable primitive:
+
+* `request(payload, { timeoutMs?, id? }): Promise<ApprovalOutcome>` — **always
+  resolves, never rejects**. On timeout it resolves `{ decision: "timeout" }`
+  so callers can fall back gracefully.
+* `decide(id, "approve" | "reject", metadata?): boolean` — settles the awaiting
+  Promise. Idempotent and race-safe: a decision after timeout or a second
+  decision is a no-op (`false`), never a double-settle or throw.
+* `list()` / `get(id)` / `has(id)` / `size` — inspect pending requests.
+* `clear()` — settle all pending as timeouts (shutdown).
+* Emits `request`, `decision`, `timeout`. Timers are cleared on settle and
+  decided/timed-out entries removed from the pending map (no leaks). Inputs
+  are Zod-validated at the boundary.
+
+### `HandoffManager` (`src/handoff/handoff-manager.ts`, #75)
+
+Per-thread AI↔human ownership with cancellation:
+
+* `register(threadId, controller = new AbortController()): { controller,
+  unregister }` — wire the `signal` into in-flight draft generation; this is
+  the minimal cancellation interface the auto-reply pipeline (#78) plugs into.
+* `takeOver(threadId, reason?)` — synchronously aborts every registered
+  controller (well within the 2s budget) and marks the thread human-owned.
+* `release(threadId, reason?)` — return ownership to AI.
+* `isHumanOwned(threadId)` / `owner(threadId)` / `list()` — query state.
+* Emits `ownership.change` (`{ threadId, owner, previous, reason?, at }`).
+  Registering a draft on an already human-owned thread aborts it immediately.
 
 ## 13. Security model
 
