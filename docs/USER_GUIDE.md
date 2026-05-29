@@ -49,6 +49,30 @@ Only your *progress* is stored in the browser — secrets are held server-side i
 the encrypted vault (see §10). Telegram here is a minimal connection check; the
 full Telegram control surface is described in §8.
 
+## 4. Connecting Meta accounts + composing
+
+openzigs-social can publish to **Instagram**, **Facebook Pages**, and
+**Threads** through the Meta Graph API (epic #53). This is opt-in: the
+connectors stay dark until you set `platform.meta.enabled = true` in your
+config (see §12) and restart the server. With it off, no Meta network calls are
+ever made.
+
+**Connecting an account.** You connect each platform with your own Meta app
+(BYOK) — the app id/secret and the per-account access tokens are stored
+encrypted in the vault and are never displayed or logged. After completing the
+Meta OAuth handshake, the account shows up as connected.
+
+**Check what's connected.** The composer reads `GET /api/connections`, which
+reports each platform's status — `connected`, `needsReconsent` (token expired or
+revoked), and a label (Instagram / Facebook Pages / Threads). The endpoint never
+returns the tokens themselves.
+
+**Compose + pick targets.** Open `/compose`. Under **Publish to** you'll see a
+checkbox for each platform. Connected accounts are selectable; accounts that
+aren't connected (or need reconnecting) are shown disabled with a hint. Tick the
+accounts you want, write your post, and the footer shows exactly where it will
+publish.
+
 ## 8. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your

@@ -102,6 +102,8 @@ Layout under the data directory:
 | `platform/retry/` | Exponential backoff, retry, dead-letter queue (#142) |
 | `platform/social-brain/` | Idempotent inbound persistence (contacts/threads/messages) (#143) |
 | `platform/dm/` | `SocialDmSenderRegistry` (the #51 port) + rule-chain `DmDispatcher` (#144) |
+| `connectors/meta/` | Cohort A connectors: Instagram + Facebook Pages + Threads via Meta Graph API `v25.0`, built on the #127 ports (epic #53) |
+| `server/connections/router.ts` | `GET /api/connections` — per-platform connect/needs-reconsent status (never echoes tokens) (#53) |
 
 ## 5. UI map (`ui/`)
 
@@ -116,6 +118,9 @@ It runs on port `3001` in development and talks to the Node server (port
 | `app/providers.tsx` | Client providers: TanStack Query, `ThemeProvider`, the Socket.IO client, and the toast `Toaster`; exposes `useSocket()` |
 | `app/page.tsx` | Dashboard shell — KPI card grid + quick-actions dialog |
 | `app/{inbox,compose,calendar,analytics,contacts,settings}/page.tsx` | Route placeholders for the primary nav destinations |
+| `app/compose/page.tsx` | Composer: per-account publish-target picker + post body (epic #53) |
+| `components/compose/publish-targets.tsx` | Publish-target checkbox list driven by `GET /api/connections` (#53) |
+| `lib/connections.ts` | `fetchConnections()` client for `GET /api/connections` (#53) |
 | `components/top-nav.tsx` | Primary top navigation (active-route `aria-current`) + theme toggle |
 | `components/theme-provider.tsx` | Theme context backed by `useSyncExternalStore`; `localStorage` persistence + system-scheme tracking |
 | `components/theme-toggle.tsx` | System/light/dark dropdown toggle |
@@ -154,6 +159,10 @@ share:
 | `social_messages` | Inbound/outbound messages, `UNIQUE (platform, platform_message_id)`, FK → thread + contact |
 | `webhook_events` | Dedupe ledger, `UNIQUE (platform, event_id)` so replays are no-ops |
 | `outbox_dlq` | Dead-letter queue for terminally-failed outbound ops (#142) |
+
+`0003-meta-insights.sql` (epic #53) adds `platform_insights_raw` — raw
+per-object metric snapshots (`UNIQUE (platform, object_id, metric, captured_for)`)
+written by the Facebook/Threads insights pollers via `InsightsRepository`.
 
 ## 7. Copilot SDK runtime + smart router + privacy mode
 
@@ -357,6 +366,65 @@ channel, so once a connector registers an adapter the relay stops reporting
 `humanOwnedGuard` (stops when the #128 `HandoffManager` marks the thread
 human-owned) and `approvalGatedReply` (routes a draft through the #128
 `ApprovalQueue` before sending).
+
+## 12.3 Cohort A connectors — Instagram / Facebook Pages / Threads (#53)
+
+`src/connectors/meta/` is the first concrete connector epic. It consumes the
+#127 ports rather than reinventing them, so the connector code is small and
+focused on the Meta Graph API (`v25.0`) surface. The whole module is opt-in
+behind `platform.meta.enabled` (default `false`); when disabled there is zero
+Meta network surface. Every credential — the Meta app id/secret and per-account
+access tokens — is read from the encrypted vault (`getMeta()`), never config or
+logs, and user-supplied Graph URLs pass through the SSRF guard.
+
+| Sub-issue | Module | Responsibility |
+| --- | --- | --- |
+| #54 | `graph-client.ts` / `dispatcher.ts` | `MetaGraphClient` transport (SSRF-validated `v25.0` base URLs) + `MetaDispatcher` (broker slot per op, DLQ on failure) |
+| #54/#57/#135 | `oauth.ts` | `FacebookOAuthExchanger` + `ThreadsOAuthExchanger` |
+| #55/#56 | `instagram/` | publisher, DM sender, inbox poller |
+| #57 | `facebook/pages.ts` | pages, posts, comments, insights |
+| #135/#136/#137 | `threads/` | publisher, reply poller, insights poller |
+| #59 | `webhook-handler.ts` | `x-hub-signature-256` verified handler for all three platforms |
+| — | `scheduler.ts` / `index.ts` | poll scheduler + `registerMetaConnectors` wiring |
+
+### How each #127 port is consumed
+
+* **`OAuthTokenExchanger` (#139)** — `FacebookOAuthExchanger` (long-lived
+  `fb_exchange_token`) and `ThreadsOAuthExchanger` (`th_exchange_token`)
+  implement the port and are registered in the `ConnectorRegistry` for
+  `facebook`/`instagram` and `threads`, so the shared `GET /oauth/callback/:platform`
+  router persists Meta tokens to the vault unchanged.
+* **`WebhookHandler` (#140)** — `createMetaWebhookHandler` verifies the
+  `x-hub-signature-256` HMAC via the shared constant-time `hmac.ts`, derives a
+  stable `entry[].id:time` event id (deduped by `WebhookEventStore`), and is
+  registered in the `WebhookHandlerRegistry` for all three platforms.
+* **`RateLimitBroker` (#141)** — `MetaDispatcher.dispatch` acquires a per-op
+  broker slot from the `meta` budget before every Graph call; a denied slot is
+  routed to the DLQ rather than hammering the API.
+* **retry + DLQ (#142)** — terminal/transient failures (classified by
+  `isTransientMetaError`) flow through the dispatcher into `DlqRepository`
+  (`outbox_dlq`); the dispatcher never throws.
+* **`SocialBrainRepository` (#143)** — the IG inbox poller and the Threads
+  reply poller persist inbound messages idempotently, so webhook/poll overlap
+  never duplicates rows.
+* **`SocialDmSenderRegistry` (#144 / #51)** — `InstagramDmSender` implements the
+  `SocialDmSender` port and is registered under `instagram`, making Telegram's
+  `/dm instagram …` relay live once Meta is connected.
+
+`registerMetaConnectors(deps)` is the single composition seam: `startServer`
+calls it (guarded on `platform.meta.enabled`, wrapped in try/catch) to build the
+graph clients + dispatcher and wire the exchangers, webhook handlers, and DM
+sender into the existing #127 registries.
+
+### Connections endpoint + composer UI
+
+`GET /api/connections` (`src/server/connections/router.ts`) reports a flat list
+of `{ platform, label, connected, needsReconsent, expiresAt? }` for Instagram /
+Facebook Pages / Threads — derived from vault token state, **never echoing the
+tokens themselves**. The Next.js composer (`ui/app/compose/page.tsx`) reads it
+via `lib/connections.ts` and renders a per-account publish-target checkbox
+(`components/compose/publish-targets.tsx`); disconnected accounts are shown
+disabled with a "connect"/"reconnect required" hint.
 
 ## 13. Security model
 

@@ -108,6 +108,41 @@ export const ConfigSchema = z
               .default(10 * 60 * 1000)
           })
           .strict()
+          .default({}),
+        /**
+         * Meta (Instagram / Facebook Pages / Threads) connector — Cohort A
+         * (#53). Opt-in; the Meta app id/secret + per-account tokens live in
+         * the encrypted vault (BYOK), never here. This block only carries the
+         * non-secret on/off switch, Graph hosts, rate-limit budgets, and the
+         * polling-fallback cadence.
+         */
+        meta: z
+          .object({
+            enabled: booleanish.default(false),
+            /** Facebook/Instagram Graph host base (override for testing). */
+            graphBaseUrl: z.string().url().default("https://graph.facebook.com/v25.0"),
+            /** Threads Graph host base (override for testing). */
+            threadsBaseUrl: z.string().url().default("https://graph.threads.net/v25.0"),
+            /** Shared rate-limit budget: requests per window. */
+            budget: z
+              .object({
+                requests: z.coerce.number().int().positive().default(200),
+                windowMs: z.coerce
+                  .number()
+                  .int()
+                  .positive()
+                  .default(60 * 60 * 1000)
+              })
+              .strict()
+              .default({}),
+            /** Polling-fallback cadence (ms) when webhooks are off/miss. */
+            pollIntervalMs: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(5 * 60 * 1000)
+          })
+          .strict()
           .default({})
       })
       .strict()
