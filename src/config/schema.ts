@@ -48,6 +48,30 @@ export const ConfigSchema = z
         mode: z.enum(["off", "session", "global"]).default("off")
       })
       .strict()
+      .default({}),
+    telegram: z
+      .object({
+        /**
+         * Whether the Telegram channel runs. The bot token + primary admin
+         * chat id live in the encrypted vault, never here — this is only the
+         * non-secret on/off switch and runtime tuning.
+         */
+        enabled: booleanish.default(false),
+        /** Transport mode. Only `"polling"` is wired in v1. */
+        mode: z.enum(["polling", "webhook"]).default("polling"),
+        /**
+         * Approval auto-decision timeout in ms. `0` means wait indefinitely for
+         * a human decision (the default).
+         */
+        approvalTimeoutMs: z.coerce.number().int().nonnegative().default(0),
+        /**
+         * Additional admin chat ids allowed to command the bot, beyond the
+         * primary admin chat id stored in the vault. Deny-by-default: an empty
+         * list plus no vault admin means the bot obeys nobody.
+         */
+        adminChatIds: z.array(z.string().min(1)).default([])
+      })
+      .strict()
       .default({})
   })
   .strict();

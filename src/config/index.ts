@@ -23,7 +23,9 @@ const ENV_MAP: Record<string, string> = {
   OPENZIGS_SOCIAL_UI_ORIGIN: "server.uiOrigin",
   OPENZIGS_SOCIAL_LOG_LEVEL: "logging.level",
   OPENZIGS_SOCIAL_LOG_TO_FILE: "logging.toFile",
-  OPENZIGS_SOCIAL_PRIVACY_MODE: "privacy.mode"
+  OPENZIGS_SOCIAL_PRIVACY_MODE: "privacy.mode",
+  OPENZIGS_SOCIAL_TELEGRAM_ENABLED: "telegram.enabled",
+  OPENZIGS_SOCIAL_TELEGRAM_MODE: "telegram.mode"
 };
 
 type Json = Record<string, unknown>;

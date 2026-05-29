@@ -92,6 +92,8 @@ Layout under the data directory:
 | `vault/` | Encrypted credential vault + OAuth refresh scheduler (epic #28) |
 | `approvals/approval-queue.ts` | `ApprovalQueue` — awaitable-Promise + EventEmitter approval primitive (epic #128) |
 | `handoff/handoff-manager.ts` | `HandoffManager` — per-thread AI↔human ownership + draft cancellation (epic #128) |
+| `channels/telegram/` | Telegram remote-control channel: grammy bot, inline approval keyboards, `/queue` menu, DM relay, admin ACL (epic #47) |
+| `channels/social/dm-sender.ts` | `SocialDmSender` port — outbound DM contract implemented by the platform service (#127) |
 
 ## 5. UI map (`ui/`)
 
@@ -219,6 +221,48 @@ Per-thread AI↔human ownership with cancellation:
 * `isHumanOwned(threadId)` / `owner(threadId)` / `list()` — query state.
 * Emits `ownership.change` (`{ threadId, owner, previous, reason?, at }`).
   Registering a draft on an already human-owned thread aborts it immediately.
+
+## 12.1 Telegram remote-control channel (#47)
+
+The Telegram bot (`src/channels/telegram/`) is openzigs-social's only push +
+remote-control surface. It is **opt-in** (`telegram.enabled`, default `false`)
+and reads its bot token + primary admin chat id from the encrypted vault. The
+grammy `Bot` is **injected** into `TelegramChannel`, so tests intercept every
+outgoing API call with a transformer — no network is required to verify the
+channel.
+
+`TelegramChannel.register()` wires the bot in a fixed, deny-by-default order:
+
+1. **ACL middleware** (`acl.ts`, #52) — runs first; any update from a chat not
+   on the admin allow-list is logged (chat id only) and silently dropped.
+2. **`@grammyjs/menu` queue menu** — the interactive `/queue` listing (#48).
+3. **Admin commands** (`commands.ts`, #52) — `/start`, `/status`, `/privacy`,
+   `/queue`, `/dm`.
+4. **Inline approval callbacks** (`approval-keyboard.ts`, #50) — `oz:appr:*`
+   callback data, parsed defensively.
+5. **Approval-queue bridge** — subscribes to the shared `ApprovalQueue`.
+
+There is exactly one approval system (the #128 `ApprovalQueue`); Telegram is
+only a rendering + routing layer on top of it.
+
+```mermaid
+sequenceDiagram
+  participant Q as ApprovalQueue (#128)
+  participant C as TelegramChannel
+  participant T as Telegram (admin chat)
+  Q->>C: emit "request" (PendingApproval)
+  C->>T: sendMessage + Approve/Reject keyboard
+  T-->>C: callback_query oz:appr:approve:<id>
+  C->>Q: decide(id, "approve")
+  Q-->>C: emit "decision" (ApprovalOutcome)
+  C->>T: editMessageText "✅ Approved"
+```
+
+The **DM relay** (#51) parses `/dm <platform> <recipient> <message>` and
+delivers through the `SocialDmSender` port (`channels/social/dm-sender.ts`).
+No adapter is wired yet (the platform service #127 owns them), so the relay
+reports "unavailable" rather than faking a send — there are no stub network
+calls.
 
 ## 13. Security model
 

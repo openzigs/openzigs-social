@@ -11,6 +11,11 @@ import type { Database } from "better-sqlite3";
 import { getConfig } from "../config/index.js";
 import { existsSync, statSync } from "node:fs";
 import { vaultPath } from "../config/paths.js";
+import { ApprovalQueue } from "../approvals/index.js";
+import {
+  createTelegramChannelFromVault,
+  type TelegramChannel
+} from "../channels/telegram/index.js";
 import { AuditLogger } from "../logging/audit-logger.js";
 import { createLogger } from "../logging/logger.js";
 import { closeDb, getDb } from "../db/index.js";
@@ -85,10 +90,31 @@ export async function startServer(): Promise<StartedServer> {
   logger.info("server.listening", { host: config.server.host, port });
   await audit.log({ category: "config", event: "server.started", details: { port } });
 
+  // Telegram remote-control channel (epic #47). Opt-in via config; never blocks
+  // server start. The bot token + admin chat id come from the encrypted vault.
+  let telegram: TelegramChannel | undefined;
+  if (config.telegram.enabled) {
+    try {
+      telegram = await createTelegramChannelFromVault({
+        vault: new CredentialVault(),
+        config: config.telegram,
+        approvals: new ApprovalQueue({ defaultTimeoutMs: config.telegram.approvalTimeoutMs }),
+        logger
+      });
+      await telegram?.start();
+    } catch (err) {
+      logger.error("telegram.start_failed", {
+        error: err instanceof Error ? err.message : String(err)
+      });
+      telegram = undefined;
+    }
+  }
+
   let closed = false;
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
+    if (telegram) await telegram.stop().catch(() => undefined);
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     closeDb();
