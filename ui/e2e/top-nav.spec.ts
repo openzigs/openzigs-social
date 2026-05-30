@@ -5,7 +5,7 @@ import { AppShell, NAV_LINKS } from "./pages/app-shell.page";
 /**
  * Epic #41 / sub-issue #43 — top-nav with route links.
  *
- * AC: all six route links present; clicking a link navigates and sets the
+ * AC: all primary route links present; clicking a link navigates and sets the
  * active state via `aria-current="page"`.
  */
 test.describe("Top navigation (#43)", () => {
@@ -16,8 +16,8 @@ test.describe("Top navigation (#43)", () => {
     await shell.goto("/");
   });
 
-  // AC: "Build top-nav with route links (Inbox, Compose, Calendar, Analytics, Contacts, Settings)"
-  test("renders all six primary route links", async () => {
+  // AC: "Build top-nav with route links (Inbox, Compose, Calendar, Outbox, Analytics, Contacts, Settings)"
+  test("renders all primary route links", async () => {
     await expect(shell.primaryNav).toBeVisible();
     for (const { name } of NAV_LINKS) {
       await expect(shell.navLink(name)).toBeVisible();

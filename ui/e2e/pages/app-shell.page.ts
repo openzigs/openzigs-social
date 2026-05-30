@@ -2,11 +2,12 @@ import type { Locator, Page } from "@playwright/test";
 
 export type ThemeOption = "Light" | "Dark" | "System";
 
-/** The six primary destinations rendered in the top-nav (#43). */
+/** The primary destinations rendered in the top-nav (#43, #84). */
 export const NAV_LINKS = [
   { name: "Inbox", path: "/inbox" },
   { name: "Compose", path: "/compose" },
   { name: "Calendar", path: "/calendar" },
+  { name: "Outbox", path: "/outbox" },
   { name: "Analytics", path: "/analytics" },
   { name: "Contacts", path: "/contacts" },
   { name: "Settings", path: "/settings" }

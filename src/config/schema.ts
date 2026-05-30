@@ -310,6 +310,24 @@ export const ConfigSchema = z
           .default({})
       })
       .strict()
+      .default({}),
+    outbox: z
+      .object({
+        /**
+         * Whether the node-cron poller drains scheduled posts. Off by default;
+         * the composer + calendar still work (drafts/scheduling) without it,
+         * but nothing is auto-published until this is enabled.
+         */
+        enabled: booleanish.default(false),
+        /**
+         * Cron cadence for the poll. Default every 30s — comfortably inside the
+         * 60s publish-latency target. Validated by node-cron at startup.
+         */
+        cron: z.string().min(1).default("*/30 * * * * *"),
+        /** Max due posts claimed and published per tick. */
+        batchSize: z.coerce.number().int().positive().max(500).default(25)
+      })
+      .strict()
       .default({})
   })
   .strict();

@@ -42,6 +42,13 @@ import { registerTwitterConnectors } from "../connectors/twitter/index.js";
 import { tierWriteQuota } from "../connectors/twitter/tiers.js";
 import { createTwitterRouter } from "./twitter/router.js";
 import { createInboxRouter } from "./inbox/router.js";
+import { createOutboxRouter } from "./outbox/router.js";
+import { buildOutboxDispatch } from "./outbox/publishers.js";
+import { OutboxPoller } from "../outbox/poller.js";
+import { OutboxRepository } from "../outbox/repository.js";
+import { OutboxScheduler } from "../outbox/scheduler.js";
+import type { TwitterConnectors } from "../connectors/twitter/index.js";
+import type { LinkedInConnectors } from "../connectors/linkedin/index.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
@@ -164,9 +171,13 @@ export async function startServer(): Promise<StartedServer> {
     alert?: (text: string) => void;
   } = {};
 
+  // Captured connector publishers the outbox dispatch (#86) drains through.
+  let twitterConnectors: TwitterConnectors | undefined;
+  let linkedinConnectors: LinkedInConnectors | undefined;
+
   if (config.platform.linkedin.enabled) {
     try {
-      await registerLinkedInConnectors({
+      linkedinConnectors = await registerLinkedInConnectors({
         config: {
           restBaseUrl: config.platform.linkedin.restBaseUrl,
           oauthCallbackBaseUrl
@@ -260,7 +271,7 @@ export async function startServer(): Promise<StartedServer> {
   if (config.platform.twitter.enabled) {
     try {
       const tw = config.platform.twitter;
-      await registerTwitterConnectors({
+      twitterConnectors = await registerTwitterConnectors({
         config: {
           apiBaseUrl: tw.apiBaseUrl,
           tokenUrl: tw.tokenUrl,
@@ -344,6 +355,41 @@ export async function startServer(): Promise<StartedServer> {
     emit: (event, payload) => quotaSink.emit?.(event, payload)
   });
 
+  // Outbox router + poller + scheduler (epic #84). The router serves the
+  // composer/calendar; the poller drains due scheduled posts through the
+  // per-platform dispatch built from the captured connector publishers; the
+  // node-cron scheduler ticks it (started after listen, when enabled).
+  const outboxDlq = new DlqRepository(db);
+  const outboxRouter = createOutboxRouter({
+    db,
+    dlq: outboxDlq,
+    emit: (event, payload) => quotaSink.emit?.(event, payload)
+  });
+  const outboxDispatch = buildOutboxDispatch({
+    vault,
+    twitter: twitterConnectors?.publisher,
+    linkedin: linkedinConnectors?.publisher
+  });
+  const outboxPoller = new OutboxPoller({
+    repo: new OutboxRepository(db),
+    dispatch: outboxDispatch,
+    dlq: outboxDlq,
+    batchSize: config.outbox.batchSize,
+    emit: (event, payload) => quotaSink.emit?.(event, payload),
+    logger: {
+      info: (msg, meta) => logger.info(msg, meta),
+      error: (msg, meta) => logger.error(msg, meta)
+    }
+  });
+  const outboxScheduler = new OutboxScheduler({
+    poller: outboxPoller,
+    cronExpression: config.outbox.cron,
+    logger: {
+      info: (msg, meta) => logger.info(msg, meta),
+      error: (msg, meta) => logger.error(msg, meta)
+    }
+  });
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
@@ -351,7 +397,8 @@ export async function startServer(): Promise<StartedServer> {
     uiOrigin: config.server.uiOrigin,
     platform: { oauthRouter, webhookRouter },
     twitterRouter,
-    inboxRouter
+    inboxRouter,
+    outboxRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {
@@ -370,6 +417,13 @@ export async function startServer(): Promise<StartedServer> {
 
   logger.info("server.listening", { host: config.server.host, port });
   await audit.log({ category: "config", event: "server.started", details: { port } });
+
+  // Start the outbox poller (epic #84) once listening, when enabled. The
+  // scheduler ticks node-cron; the actual publishing flows through the captured
+  // connector publishers gated by their own enable flags.
+  if (config.outbox.enabled) {
+    outboxScheduler.start();
+  }
 
   // Telegram remote-control channel (epic #47). Opt-in via config; never blocks
   // server start. The bot token + admin chat id come from the encrypted vault.
@@ -401,6 +455,7 @@ export async function startServer(): Promise<StartedServer> {
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
+    outboxScheduler.stop();
     if (telegram) await telegram.stop().catch(() => undefined);
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
