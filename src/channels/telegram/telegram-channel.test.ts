@@ -325,4 +325,52 @@ describe("TelegramChannel", () => {
     await flush();
     expect(calls.filter((c) => c.method === "sendMessage")).toHaveLength(0);
   });
+
+  it("notify pushes a plain message to every admin chat", async () => {
+    const SECOND_ADMIN = 7777;
+    const { bot, calls } = createTestBot();
+    const channel = new TelegramChannel({
+      bot,
+      approvals,
+      adminChatIds: [ADMIN, SECOND_ADMIN]
+    });
+
+    await channel.notify("X write quota at 80%");
+
+    const sends = calls.filter((c) => c.method === "sendMessage");
+    expect(sends).toHaveLength(2);
+    expect(sends.map((c) => String(c.payload.chat_id))).toEqual([
+      String(ADMIN),
+      String(SECOND_ADMIN)
+    ]);
+    expect(sends.every((c) => c.payload.text === "X write quota at 80%")).toBe(true);
+  });
+
+  it("notify is a no-op when no admin chats are configured", async () => {
+    const { bot, calls } = createTestBot();
+    const channel = new TelegramChannel({ bot, approvals, adminChatIds: [] });
+
+    await channel.notify("nobody hears this");
+
+    expect(calls.filter((c) => c.method === "sendMessage")).toHaveLength(0);
+  });
+
+  it("notify swallows per-chat send failures so one bad chat can't block alerts", async () => {
+    const SECOND_ADMIN = 7777;
+    const { bot, calls } = createTestBot();
+    const original = bot.api.sendMessage.bind(bot.api);
+    vi.spyOn(bot.api, "sendMessage").mockImplementation(async (chatId, text, other) => {
+      if (String(chatId) === String(ADMIN)) throw new Error("chat blocked the bot");
+      return original(chatId, text, other);
+    });
+    const channel = new TelegramChannel({
+      bot,
+      approvals,
+      adminChatIds: [ADMIN, SECOND_ADMIN]
+    });
+
+    await expect(channel.notify("alert")).resolves.toBeUndefined();
+    const delivered = calls.filter((c) => c.method === "sendMessage");
+    expect(delivered.map((c) => String(c.payload.chat_id))).toContain(String(SECOND_ADMIN));
+  });
 });

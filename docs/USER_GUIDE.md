@@ -111,6 +111,61 @@ alongside the Meta platforms.
   app's audit is approved by TikTok — no app changes are needed beyond that
   approval.
 
+## 6. Connecting X / Twitter (Cohort C)
+
+openzigs-social can also publish to **X (Twitter)** via the v2 API (epic #66).
+It is opt-in — set the flag, pick your access tier, and restart:
+
+```json
+{
+  "platform": {
+    "twitter": {
+      "enabled": true,
+      "tier": "basic",
+      "dmEnabled": false
+    }
+  }
+}
+```
+
+(or `OPENZIGS_SOCIAL_PLATFORM_TWITTER_ENABLED=true`,
+`OPENZIGS_SOCIAL_PLATFORM_TWITTER_TIER=basic`,
+`OPENZIGS_SOCIAL_PLATFORM_TWITTER_DM_ENABLED=true`). With the flag off, X makes
+no network calls and the quota endpoint is not mounted.
+
+As with the other platforms, you bring your own app (BYOK): the X
+client id/secret and per-account OAuth tokens are stored encrypted in the vault
+and never displayed or logged. The connector uses OAuth 2.0 with PKCE. After the
+handshake, X appears as connected in the composer's **Publish to** list.
+
+### Write-quota awareness
+
+X meters **writes** (tweets, replies, and DMs) per month against your access
+tier. openzigs-social keeps a local, month-to-date count of every successful
+write and surfaces it in the **X write quota** panel. The tier caps (overridable
+in config under `platform.twitter.writeQuota`) default to:
+
+| Tier | Monthly write cap |
+| --- | --- |
+| Free | 1,500 |
+| Basic | 50,000 |
+| Pro | 1,000,000 |
+
+When usage crosses the warning threshold (80% by default) and again when it hits
+the cap, you get a one-time Telegram alert and a live update in the panel. Once
+the cap is reached, the app **stops issuing writes** (it fails closed rather than
+incurring API overage) until the next month rolls over.
+
+### Known limitations
+
+* **DM is off by default and unavailable on the Free tier.** Direct messaging is
+  disabled unless you explicitly set `dmEnabled: true` **and** are on a paid tier
+  (Basic or Pro). X gates DM behind paid access, so on Free the app registers no
+  DM sender and refuses to send. DM rate limits (15 requests / 15 min, 1,440 /
+  24 hr) are enforced automatically.
+* **Polling-only inbound.** v1 does not register an X webhook; inbound DMs and
+  analytics are gathered by polling.
+
 ## 8. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your

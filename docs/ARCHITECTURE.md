@@ -104,6 +104,7 @@ Layout under the data directory:
 | `platform/dm/` | `SocialDmSenderRegistry` (the #51 port) + rule-chain `DmDispatcher` (#144) |
 | `connectors/meta/` | Cohort A connectors: Instagram + Facebook Pages + Threads via Meta Graph API `v25.0`, built on the #127 ports (epic #53) |
 | `connectors/{linkedin,pinterest,tiktok}/` | Cohort B connectors: LinkedIn (no DM) + Pinterest + TikTok (PRIVATE-only), built on the #127 ports (epic #60) |
+| `connectors/twitter/` | Cohort C connector: X (Twitter) v2 with per-tier write-quota tracking + DM gated to paid tiers, built on the #127 ports (epic #66) |
 | `server/connections/router.ts` | `GET /api/connections` — per-platform connect/needs-reconsent status (never echoes tokens) (#53) |
 
 ## 5. UI map (`ui/`)
@@ -488,6 +489,75 @@ polling fallback only — no `WebhookHandler` is registered.
 The connections endpoint and composer UI from §12.3 are platform-agnostic and
 extend to LinkedIn / Pinterest / TikTok automatically (the platform list lives
 in `src/server/connections/router.ts`).
+
+## 12.5 Cohort C connector — X / Twitter v2 (#66)
+
+`src/connectors/twitter/` adds the X (Twitter) v2 connector on the **same** #127
+ports as Cohorts A/B — no connector-local rate-limit, retry, OAuth-callback, or
+webhook-verify code. It is opt-in behind `platform.twitter.enabled` (default
+`false`); when disabled there is zero X network surface and no quota route is
+mounted. The X app `clientId`/`clientSecret` and per-account OAuth tokens live
+only in the encrypted vault (`getTwitter()` / `getOAuth("twitter")`) — never
+config or logs — and every API/token URL passes through the SSRF guard
+(`assertSafeUrl`).
+
+| Sub-issue | Module | Responsibility |
+| --- | --- | --- |
+| #67 | `twitter/rest-client.ts` / `dispatcher.ts` / `oauth.ts` | OAuth 2.0 PKCE exchanger (public + confidential clients), SSRF-guarded REST transport (429/5xx-aware error envelope), dispatcher over the shared broker + DLQ |
+| #68 | `twitter/publisher.ts` / `tiers.ts` | Tweet + reply publisher; per-tier write-quota sizing (Free / Basic / Pro) and DM-permission policy |
+| #69 | `twitter/credit-tracker.ts` / `quota-guard.ts` | Month-to-date write-credit ledger (`twitter_credit_usage`, migration `0004`, idempotent on `dedupe_key`) + edge-triggered warn/exceed guard |
+| #70 | `twitter/dm.ts` / `analytics-poller.ts` / `index.ts` | DM sender + inbound DM poller (paid-tier only), follower/tweet-metric analytics → `InsightsRepository`, `registerTwitterConnectors` composition seam |
+
+### How each #127 port is consumed
+
+* **`OAuthTokenExchanger` (#139)** — registers one `twitter` exchanger into the
+  shared `ConnectorRegistry`; the existing `GET /oauth/callback/:platform`
+  router persists tokens unchanged. The exchanger uses OAuth 2.0 with PKCE; a
+  public client puts `client_id` in the body, a confidential client uses HTTP
+  Basic. Default scopes never request `dm.*`.
+* **`RateLimitBroker` (#141)** — a dedicated broker carries two budgets:
+  `twitter` (general writes) and `twitter-dm` (X's 15 req / 15 min + 1440 / 24 hr
+  DM limit, expressed as a daily `quota`). Every write/DM/poll op acquires a slot
+  before the HTTP call; a denied slot lands in the DLQ.
+* **retry + DLQ (#142)** — `isTransientTwitterError` (429 + 5xx) feeds the shared
+  `dispatchWithDlq`; the dispatcher never throws.
+* **`SocialBrainRepository` (#143)** — the inbound DM poller persists DMs
+  idempotently (skips already-seen message ids).
+* **analytics (#96)** — follower counts and per-tweet metrics (likes, retweets,
+  replies, quotes, impressions) reuse `InsightsRepository` /
+  `platform_insights_raw` (migration `0003`), idempotent on
+  `(platform, object_type, object_id, metric, captured_for)`.
+
+### Write-quota tracking + surfacing
+
+X's v2 API meters monthly **writes** (tweets + replies + DMs) per access tier.
+`TwitterCreditTracker` records each successful write into `twitter_credit_usage`
+(migration `0004`), idempotent on the connector-supplied `dedupeKey` so retries
+never inflate usage. `TwitterQuotaGuard` compares month-to-date usage against the
+tier cap (`tiers.ts`: Free 1 500, Basic 50 000, Pro 1 000 000 by default) and is
+**edge-triggered**: it emits a `twitter:quota` socket event and fires a Telegram
+alert exactly once per threshold crossing (warn at `warnThreshold`, default 0.8;
+and at exhaustion). `ensureWithinQuota()` throws `TwitterQuotaExceededError`
+**before** any API call once the cap is reached, so the connector fails closed
+rather than incurring overage. `GET /api/twitter/quota`
+(`src/server/twitter/router.ts`, rate-limited 60 req/min) recomputes the summary
+from the ledger on each request — reading only non-secret aggregates, never token
+material — and the `TwitterQuotaPanel` UI widget (`ui/components/`) renders it
+live off the socket event.
+
+### v1 platform limitations
+
+* **DM disabled by default, and force-disabled on Free (#70).** `dmEnabled`
+  defaults to `false`. Even when set, the Free tier force-disables DM
+  (`isDmEnabledForTier` mirrors X gating DM behind paid access): on Free the
+  connector registers **no** DM sender and `TwitterDmSender.sendDm()` throws
+  `TwitterDmDisabledError` (fail closed). DM is only ever live on a paid tier
+  with `dmEnabled: true`.
+* **Polling-only inbound.** No X webhook is registered in v1; inbound DMs and
+  metrics rely on the polling fallback only.
+
+The connections endpoint and composer UI extend to X automatically (the platform
+list lives in `src/server/connections/router.ts`, labelled `X (Twitter)`).
 
 ## 13. Security model
 

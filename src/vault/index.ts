@@ -9,6 +9,7 @@ export {
   ProviderCredentialSchema,
   TelegramCredentialSchema,
   TikTokAppCredentialSchema,
+  TwitterAppCredentialSchema,
   VaultSchema,
   type LinkedInAppCredential,
   type MetaAppCredential,
@@ -17,6 +18,7 @@ export {
   type ProviderCredential,
   type TelegramCredential,
   type TikTokAppCredential,
+  type TwitterAppCredential,
   type Vault
 } from "./types.js";
 export {

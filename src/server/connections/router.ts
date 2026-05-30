@@ -19,7 +19,15 @@ export interface ConnectionsRouterDeps {
 }
 
 /** Publish-capable platforms, in display order. */
-const PLATFORMS = ["instagram", "facebook", "threads", "linkedin", "pinterest", "tiktok"] as const;
+const PLATFORMS = [
+  "instagram",
+  "facebook",
+  "threads",
+  "linkedin",
+  "pinterest",
+  "tiktok",
+  "twitter"
+] as const;
 type Platform = (typeof PLATFORMS)[number];
 
 const PLATFORM_LABELS: Record<Platform, string> = {
@@ -28,7 +36,8 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   threads: "Threads",
   linkedin: "LinkedIn",
   pinterest: "Pinterest",
-  tiktok: "TikTok"
+  tiktok: "TikTok",
+  twitter: "X (Twitter)"
 };
 
 export interface ConnectionSummary {

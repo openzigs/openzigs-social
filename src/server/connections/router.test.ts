@@ -57,11 +57,13 @@ describe("connections router", () => {
       "threads",
       "linkedin",
       "pinterest",
-      "tiktok"
+      "tiktok",
+      "twitter"
     ]);
     expect(body.connections.every((c) => c.connected === false)).toBe(true);
     expect(body.connections.find((c) => c.platform === "facebook")?.label).toBe("Facebook Pages");
     expect(body.connections.find((c) => c.platform === "tiktok")?.label).toBe("TikTok");
+    expect(body.connections.find((c) => c.platform === "twitter")?.label).toBe("X (Twitter)");
   });
 
   it("marks a platform connected once an OAuth token is stored", async () => {
@@ -86,6 +88,18 @@ describe("connections router", () => {
     const threads = body.connections.find((c) => c.platform === "threads");
     expect(threads?.connected).toBe(false);
     expect(threads?.needsReconsent).toBe(true);
+  });
+
+  it("marks X (Twitter) connected once an OAuth token is stored", async () => {
+    await vault.setOAuth("twitter", { accessToken: "tok", expiresAt: 4242 });
+    await mount();
+    const res = await fetch(`${base}/api/connections`);
+    const body = (await res.json()) as {
+      connections: Array<{ platform: string; connected: boolean; expiresAt?: number }>;
+    };
+    const tw = body.connections.find((c) => c.platform === "twitter");
+    expect(tw?.connected).toBe(true);
+    expect(tw?.expiresAt).toBe(4242);
   });
 
   it("never echoes token material", async () => {

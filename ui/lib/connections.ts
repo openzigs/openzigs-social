@@ -7,7 +7,8 @@ export type ConnectionPlatform =
   | "threads"
   | "linkedin"
   | "pinterest"
-  | "tiktok";
+  | "tiktok"
+  | "twitter";
 
 /** One connectable publish target, as returned by `GET /api/connections`. */
 export interface ConnectionSummary {

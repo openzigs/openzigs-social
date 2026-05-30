@@ -55,6 +55,11 @@ export interface AppDeps {
     webhookRouter?: Router;
   };
   /**
+   * Pre-built X (Twitter) quota router (#66), mounted at `/api/twitter` when
+   * provided. Built in ./index.ts only when the connector is enabled.
+   */
+  twitterRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -146,6 +151,9 @@ export function createApp(deps: AppDeps): Express {
   if (deps.vault) {
     api.use("/setup", createSetupRouter({ vault: deps.vault, ...deps.setup }));
     api.use("/connections", createConnectionsRouter({ vault: deps.vault }));
+  }
+  if (deps.twitterRouter) {
+    api.use("/twitter", deps.twitterRouter);
   }
   app.use("/api", api);
 

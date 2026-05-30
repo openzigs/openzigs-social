@@ -38,6 +38,9 @@ import { InsightsRepository } from "../connectors/meta/insights/repository.js";
 import { registerLinkedInConnectors } from "../connectors/linkedin/index.js";
 import { registerPinterestConnectors } from "../connectors/pinterest/index.js";
 import { registerTikTokConnectors } from "../connectors/tiktok/index.js";
+import { registerTwitterConnectors } from "../connectors/twitter/index.js";
+import { tierWriteQuota } from "../connectors/twitter/tiers.js";
+import { createTwitterRouter } from "./twitter/router.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
@@ -152,6 +155,14 @@ export async function startServer(): Promise<StartedServer> {
   // share the SocialBrain (#143) and analytics (#96) stores with Cohort A.
   const oauthCallbackBaseUrl = `http://${config.server.host}:${config.server.port}`;
 
+  // Deferred sinks for the X write-quota guard (#70). The socket server and the
+  // Telegram channel are created later in startup, so the guard emits through
+  // these references which are populated once those exist.
+  const quotaSink: {
+    emit?: (event: string, payload: unknown) => void;
+    alert?: (text: string) => void;
+  } = {};
+
   if (config.platform.linkedin.enabled) {
     try {
       await registerLinkedInConnectors({
@@ -240,6 +251,57 @@ export async function startServer(): Promise<StartedServer> {
     }
   }
 
+  // X / Twitter (Cohort C) connector (#66) — opt-in, own rate-limit budgets.
+  // App client id/secret + per-account tokens are read from the vault (BYOK)
+  // and never logged. The DM surface is force-disabled on the Free tier. The
+  // write-quota guard (#69/#70) pushes threshold/exhaustion notices to the
+  // model panel (socket) and Telegram via the deferred `quotaSink`.
+  if (config.platform.twitter.enabled) {
+    try {
+      const tw = config.platform.twitter;
+      await registerTwitterConnectors({
+        config: {
+          apiBaseUrl: tw.apiBaseUrl,
+          tokenUrl: tw.tokenUrl,
+          tier: tw.tier,
+          dmEnabled: tw.dmEnabled,
+          writeQuota: tw.writeQuota,
+          warnThreshold: tw.warnThreshold,
+          oauthCallbackBaseUrl
+        },
+        registries: platform,
+        vault,
+        brain: new SocialBrainRepository(db),
+        broker: new RateLimitBroker({
+          budgets: {
+            twitter: {
+              capacity: tw.budget.requests,
+              refillPerSec: tw.budget.requests / (tw.budget.windowMs / 1000)
+            },
+            "twitter-dm": {
+              capacity: tw.dmBudget.requests,
+              refillPerSec: tw.dmBudget.requests / (tw.dmBudget.windowMs / 1000),
+              quota: tw.dmBudget.dailyQuota
+            }
+          }
+        }),
+        dlq: new DlqRepository(db),
+        insights: new InsightsRepository(db),
+        db,
+        getAccount: async () => {
+          const tok = await vault.getOAuth("twitter");
+          return tok ? { accessToken: tok.accessToken } : undefined;
+        },
+        emit: (event, payload) => quotaSink.emit?.(event, payload),
+        alert: (text) => quotaSink.alert?.(text)
+      });
+    } catch (err) {
+      logger.error("twitter.register_failed", {
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+
   // OAuth callback router (#139) — opt-in.
   const oauthRouter = config.platform.oauth.enabled
     ? createOAuthRouter({
@@ -261,12 +323,22 @@ export async function startServer(): Promise<StartedServer> {
       })
     : undefined;
 
+  // X (Twitter) quota router (#66) — opt-in, exposes month-to-date write usage.
+  const twitterRouter = config.platform.twitter.enabled
+    ? createTwitterRouter({
+        db,
+        tier: config.platform.twitter.tier,
+        cap: tierWriteQuota(config.platform.twitter.tier, config.platform.twitter.writeQuota)
+      })
+    : undefined;
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
     vault,
     uiOrigin: config.server.uiOrigin,
-    platform: { oauthRouter, webhookRouter }
+    platform: { oauthRouter, webhookRouter },
+    twitterRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {
@@ -274,6 +346,8 @@ export async function startServer(): Promise<StartedServer> {
     transcripts,
     metrics
   });
+  // The X write-quota guard (#70) can now emit model-panel updates.
+  quotaSink.emit = (event, payload) => io.emit(event, payload);
 
   await new Promise<void>((resolve) => {
     httpServer.listen(config.server.port, config.server.host, resolve);
@@ -303,6 +377,11 @@ export async function startServer(): Promise<StartedServer> {
       });
       telegram = undefined;
     }
+  }
+  // Route X write-quota alerts (#70) to Telegram once the channel exists.
+  if (telegram) {
+    const channel = telegram;
+    quotaSink.alert = (text) => void channel.notify(text);
   }
 
   let closed = false;
