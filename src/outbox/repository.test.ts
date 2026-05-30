@@ -89,6 +89,15 @@ describe("get / list", () => {
     expect(repo.get(999)).toBeUndefined();
   });
 
+  it("falls back to bounded pagination for invalid limits", () => {
+    for (let i = 0; i < 201; i++) {
+      repo.create({ platform: "twitter", body: `post-${i}` });
+    }
+
+    expect(repo.list({ limit: -1 })).toHaveLength(200);
+    expect(repo.list({ limit: Number.NaN })).toHaveLength(200);
+  });
+
   it("filters by status array, platform, and date range", () => {
     repo.create({ platform: "twitter", body: "a", publishAt: 1000 });
     repo.create({ platform: "linkedin", body: "b", publishAt: 5000 });
@@ -219,6 +228,28 @@ describe("markPublished / markFailed", () => {
   it("rejects publishing a row that was never claimed", () => {
     const post = repo.create({ platform: "twitter", body: "x", publishAt: 1000 });
     expect(() => repo.markPublished(post.id)).toThrow(IllegalTransitionError);
+  });
+});
+
+describe("requeueForRetry (non-blocking backoff)", () => {
+  it("re-queues a publishing post to scheduled with a future publish_at + error", () => {
+    const post = repo.create({ platform: "twitter", body: "x", publishAt: 1000 });
+    repo.claimDue(2000, 10);
+    const requeued = repo.requeueForRetry(post.id, 60_000, "transient");
+    expect(requeued.status).toBe("scheduled");
+    expect(requeued.publishAt).toBe(60_000);
+    expect(requeued.lastError).toBe("transient");
+    // attempts is owned by claimDue, not touched here.
+    expect(requeued.attempts).toBe(1);
+  });
+
+  it("permits publishing → scheduled as a legal edge", () => {
+    expect(canTransition("publishing", "scheduled")).toBe(true);
+  });
+
+  it("rejects re-queueing a row that is not publishing", () => {
+    const post = repo.create({ platform: "twitter", body: "x", publishAt: 1000 });
+    expect(() => repo.requeueForRetry(post.id, 60_000, "no")).toThrow(IllegalTransitionError);
   });
 });
 

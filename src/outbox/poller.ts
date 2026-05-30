@@ -2,30 +2,34 @@
  * Outbox poller (#86) — drains due scheduled posts and publishes them.
  *
  * Each {@link tick} atomically claims due rows (`scheduled → publishing`) and
- * publishes each through the per-platform {@link OutboxDispatch}. Retry/backoff
- * and dead-lettering are NOT reimplemented here — they are delegated to the
- * shared platform-service helpers ({@link dispatchWithDlq} + {@link DlqRepository}
- * from `src/platform/retry/`). The only outbox-specific input is the explicit
- * backoff schedule the epic mandates:
+ * attempts to publish each **once** through the per-platform {@link OutboxDispatch}.
+ * Crucially, retries do NOT block the tick: a transiently-failed publish is
+ * re-queued (`publishing → scheduled`) with `publish_at = now + backoffDelay`
+ * and simply reappears on a future due-tick. This is what keeps one persistently
+ * failing post from starving every other due post — without it, awaiting the
+ * backoff `sleep` inside the tick (combined with the scheduler's non-overlap
+ * guard) would hold the tick open for up to ~2h36m and block all other posts.
  *
- *   attempt 1 fails → wait 1m → attempt 2 fails → wait 5m → attempt 3 fails →
- *   wait 30m → attempt 4 fails → wait 2h → attempt 5 fails → dead-letter.
+ * The backoff delay comes from the explicit schedule the epic mandates, indexed
+ * by the post's `attempts` count (already incremented by the atomic claim):
  *
- * The schedule is supplied to `retry()` via an injected `sleep` seam that maps
- * the Nth retry to `OUTBOX_RETRY_SCHEDULE_MS[N]` (the generic helper's computed
- * exponential delay is intentionally ignored in favour of this fixed schedule).
- * On terminal failure the op lands in `outbox_dlq` AND the row is marked
- * `failed` with `last_error`, so the dead-letter surfaces in the UI (#89).
+ *   attempt 1 fails → re-queue +1m → attempt 2 fails → +5m → attempt 3 fails →
+ *   +30m → attempt 4 fails → +2h → attempt 5 fails → dead-letter.
  *
- * Determinism: the clock and the real timer are injectable so tests run under
- * fake timers with zero wall-clock waiting.
+ * On terminal failure (schedule exhausted, or a non-transient error) the op
+ * lands in `outbox_dlq` AND the row is marked `failed` with `last_error`, so the
+ * dead-letter surfaces in the UI (#89). `DlqRepository` lives in
+ * `src/platform/retry/` and is reused here; only the across-tick retry is
+ * outbox-specific (driven by `publish_at`, not an in-process `sleep`).
+ *
+ * Determinism: the clock is injectable so tests run under fake timers with zero
+ * wall-clock waiting and assert the exact `publish_at` offsets.
  */
 import type { DlqRepository } from "../platform/retry/dlq.js";
-import { dispatchWithDlq, type RetryOptions } from "../platform/retry/backoff.js";
-import type { OutboxDispatch } from "./dispatch.js";
+import { NoPublisherError, type OutboxDispatch } from "./dispatch.js";
 import type { OutboxPost, OutboxRepository } from "./repository.js";
 
-/** Mandated retry delays after a failed publish: 1m, 5m, 30m, 2h. */
+/** Mandated backoff delays after a failed publish: 1m, 5m, 30m, 2h. */
 export const OUTBOX_RETRY_SCHEDULE_MS: readonly number[] = [
   60_000, // 1 minute
   300_000, // 5 minutes
@@ -49,8 +53,6 @@ export interface OutboxPollerDeps {
   retryScheduleMs?: readonly number[];
   /** Classify which publish errors are transient (retryable). Default: all. */
   isTransient?: (err: unknown) => boolean;
-  /** Injectable real timer used between retries. Default: `setTimeout`. */
-  sleep?: (ms: number) => Promise<void>;
   /** Injectable clock (epoch ms). Default: `Date.now`. */
   now?: () => number;
   /** Socket emit seam for `outbox:*` events. */
@@ -62,12 +64,14 @@ export interface OutboxPollerDeps {
 export interface TickResult {
   claimed: number;
   published: number;
+  /** Posts re-queued for a later retry (`publishing → scheduled`). */
+  requeued: number;
+  /** Posts dead-lettered this tick (`publishing → failed`). */
   failed: number;
 }
 
-function defaultSleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** Per-post outcome of a single publish attempt. */
+type PublishOutcome = "published" | "requeued" | "failed";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -80,7 +84,6 @@ export class OutboxPoller {
   private readonly batchSize: number;
   private readonly schedule: readonly number[];
   private readonly isTransient: (err: unknown) => boolean;
-  private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
   private readonly emit?: (event: string, payload: unknown) => void;
   private readonly logger?: OutboxLogger;
@@ -92,7 +95,6 @@ export class OutboxPoller {
     this.batchSize = deps.batchSize ?? 25;
     this.schedule = deps.retryScheduleMs ?? OUTBOX_RETRY_SCHEDULE_MS;
     this.isTransient = deps.isTransient ?? (() => true);
-    this.sleep = deps.sleep ?? defaultSleep;
     this.now = deps.now ?? (() => Date.now());
     this.emit = deps.emit;
     this.logger = deps.logger;
@@ -102,60 +104,37 @@ export class OutboxPoller {
   async tick(): Promise<TickResult> {
     const claimed = this.repo.claimDue(this.now(), this.batchSize);
     if (claimed.length === 0) {
-      return { claimed: 0, published: 0, failed: 0 };
+      return { claimed: 0, published: 0, requeued: 0, failed: 0 };
     }
     const outcomes = await Promise.all(claimed.map((post) => this.publishOne(post)));
-    const published = outcomes.filter((ok) => ok).length;
     return {
       claimed: claimed.length,
-      published,
-      failed: claimed.length - published
+      published: outcomes.filter((o) => o === "published").length,
+      requeued: outcomes.filter((o) => o === "requeued").length,
+      failed: outcomes.filter((o) => o === "failed").length
     };
   }
 
   /**
-   * Publish a single claimed post via the shared retry/DLQ helper using the
-   * mandated fixed backoff schedule. Returns true on success.
+   * Attempt to publish a single claimed post **once**. On success → `published`.
+   * On a transient failure with retry budget remaining → re-queue via
+   * `publish_at` (non-blocking) and return `"requeued"`. On a non-transient
+   * failure or once the schedule is exhausted → dead-letter and return
+   * `"failed"`. Never sleeps inside the tick.
    */
-  private async publishOne(post: OutboxPost): Promise<boolean> {
-    // Map the Nth retry to the fixed schedule slot; the generic helper's
-    // exponential delay arg is ignored on purpose.
-    let retryIndex = 0;
-    const schedule = this.schedule;
-    const realSleep = this.sleep;
-    const options: RetryOptions = {
-      maxAttempts: schedule.length + 1,
-      isTransient: this.isTransient,
-      sleep: async (): Promise<void> => {
-        const delay = schedule[retryIndex] ?? schedule[schedule.length - 1] ?? 0;
-        retryIndex += 1;
-        await realSleep(delay);
-      }
-    };
-
-    const outcome = await dispatchWithDlq(
-      {
+  private async publishOne(post: OutboxPost): Promise<PublishOutcome> {
+    try {
+      const result = await this.dispatch.publish({
         platform: post.platform,
-        opKind: "outbox.publish",
-        payload: { outboxId: post.id, platform: post.platform, accountId: post.accountId }
-      },
-      () =>
-        this.dispatch.publish({
-          platform: post.platform,
-          accountId: post.accountId,
-          body: post.body,
-          media: post.media
-        }),
-      this.dlq,
-      options
-    );
-
-    if (outcome.ok) {
-      const updated = this.repo.markPublished(post.id, outcome.value.externalId);
+        accountId: post.accountId,
+        body: post.body,
+        media: post.media
+      });
+      const updated = this.repo.markPublished(post.id, result.externalId);
       this.logger?.info?.("outbox post published", {
         id: post.id,
         platform: post.platform,
-        externalId: outcome.value.externalId
+        externalId: result.externalId
       });
       this.emit?.("outbox:published", {
         id: updated.id,
@@ -163,16 +142,61 @@ export class OutboxPoller {
         externalId: updated.externalId,
         publishedAt: updated.publishedAt
       });
-      return true;
+      return "published";
+    } catch (err) {
+      return this.handleFailure(post, err);
+    }
+  }
+
+  /**
+   * Handle a failed publish attempt. `post.attempts` already counts the attempt
+   * just made (incremented by the atomic claim), so it is the 1-based number of
+   * the attempt that failed. While it is within the schedule and the error is
+   * transient, re-queue with `publish_at = now + schedule[attempts-1]`. Once the
+   * schedule is exhausted, or the error is non-transient, dead-letter.
+   */
+  private handleFailure(post: OutboxPost, err: unknown): PublishOutcome {
+    const message = errorMessage(err);
+    const attempt = post.attempts;
+    // A missing publisher is a permanent configuration error — waiting won't fix
+    // it, so dead-letter immediately rather than burning the backoff schedule.
+    const permanent = err instanceof NoPublisherError;
+    const canRetry = !permanent && this.isTransient(err) && attempt <= this.schedule.length;
+
+    if (canRetry) {
+      const delay = this.schedule[attempt - 1] ?? this.schedule[this.schedule.length - 1] ?? 0;
+      const publishAt = this.now() + delay;
+      const updated = this.repo.requeueForRetry(post.id, publishAt, message);
+      this.logger?.info?.("outbox post re-queued for retry", {
+        id: post.id,
+        platform: post.platform,
+        attempts: attempt,
+        publishAt,
+        error: message
+      });
+      this.emit?.("outbox:retry", {
+        id: updated.id,
+        platform: updated.platform,
+        attempts: updated.attempts,
+        publishAt: updated.publishAt,
+        lastError: updated.lastError
+      });
+      return "requeued";
     }
 
-    const message = errorMessage(outcome.error);
-    const updated = this.repo.markFailed(post.id, message, outcome.attempts);
+    const entry = this.dlq.land({
+      platform: post.platform,
+      opKind: "outbox.publish",
+      payload: { outboxId: post.id, platform: post.platform, accountId: post.accountId },
+      lastError: message,
+      attempts: attempt
+    });
+    const updated = this.repo.markFailed(post.id, message, attempt);
     this.logger?.error?.("outbox post dead-lettered", {
       id: post.id,
       platform: post.platform,
-      attempts: outcome.attempts,
-      dlqId: outcome.dlqId,
+      attempts: attempt,
+      dlqId: entry.id,
       error: message
     });
     this.emit?.("outbox:failed", {
@@ -180,8 +204,8 @@ export class OutboxPoller {
       platform: updated.platform,
       attempts: updated.attempts,
       lastError: updated.lastError,
-      dlqId: outcome.dlqId
+      dlqId: entry.id
     });
-    return false;
+    return "failed";
   }
 }

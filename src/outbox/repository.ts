@@ -7,8 +7,14 @@
  * rigor of the inbox rule repo):
  *
  *   draft → scheduled → publishing → published
+ *                            ├──────→ scheduled (transient retry re-queue)
  *                            └──────→ failed → scheduled (manual requeue)
  *   scheduled → draft (unschedule)
+ *
+ * The `publishing → scheduled` edge is how the poller drives backoff *between*
+ * ticks: a transiently-failed publish is re-queued with a future `publish_at`
+ * (now + backoff) instead of blocking the tick on an in-process sleep, so a
+ * single failing post never starves the other due posts in the same tick.
  *
  * `published` is terminal. Reschedule (#88 drag-to-reschedule) updates only
  * `publish_at` and never the platform. Every statement is a parameterized
@@ -104,7 +110,9 @@ export class OutboxNotFoundError extends Error {
 export const OUTBOX_TRANSITIONS: Record<OutboxStatus, OutboxStatus[]> = {
   draft: ["scheduled"],
   scheduled: ["draft", "publishing"],
-  publishing: ["published", "failed"],
+  // `publishing → scheduled` re-queues a transiently-failed publish for a later
+  // tick (backoff via `publish_at`); `publishing → failed` dead-letters it.
+  publishing: ["published", "failed", "scheduled"],
   published: [],
   failed: ["scheduled"]
 };
@@ -157,6 +165,12 @@ function toPost(row: OutboxRow): OutboxPost {
   if (row.last_error !== null) post.lastError = row.last_error;
   if (row.published_at !== null) post.publishedAt = row.published_at;
   return post;
+}
+
+function normalizeLimit(limit: number | undefined, fallback: number, max: number): number {
+  const value = limit ?? fallback;
+  if (!Number.isFinite(value) || value < 0) return fallback;
+  return Math.min(value, max);
 }
 
 export interface OutboxRepositoryOptions {
@@ -255,7 +269,7 @@ export class OutboxRepository {
       where.push("publish_at <= @to");
       params.to = filter.to;
     }
-    params.limit = Math.min(filter.limit ?? 200, 500);
+    params.limit = normalizeLimit(filter.limit, 200, 500);
     params.offset = Math.max(filter.offset ?? 0, 0);
     const sql =
       `SELECT * FROM outbox` +
@@ -367,6 +381,29 @@ export class OutboxRepository {
   /** Manual requeue of a failed post (`failed → scheduled`). */
   retry(id: number, publishAt: number = this.now()): OutboxPost {
     return this.transition(id, "scheduled", { publishAt, clearError: true });
+  }
+
+  /**
+   * Re-queue a claimed post for a later retry (`publishing → scheduled`) without
+   * blocking the tick. Sets `publish_at` to the next backoff slot and records
+   * `last_error`; `attempts` was already incremented by {@link claimDue}. The
+   * post simply reappears on a future due-tick once `publish_at` has elapsed.
+   */
+  requeueForRetry(id: number, publishAt: number, error: string): OutboxPost {
+    const post = this.getOrThrow(id);
+    if (!canTransition(post.status, "scheduled")) {
+      throw new IllegalTransitionError(post.status, "scheduled");
+    }
+    const now = this.now();
+    this.db
+      .prepare(
+        `UPDATE outbox
+            SET status = 'scheduled', publish_at = @publishAt, last_error = @error,
+                updated_at = @now
+          WHERE id = @id`
+      )
+      .run({ id, publishAt, error, now });
+    return this.getOrThrow(id);
   }
 
   /** Delete a post. Returns true when a row was removed. */

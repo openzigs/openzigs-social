@@ -589,7 +589,8 @@ dead-letter queue reuses the existing `outbox_dlq` table from `0002`.
 
 **State machine.** `OutboxRepository` (`src/outbox/repository.ts`) enforces the
 transitions `draft → scheduled → publishing → published`, with `publishing →
-failed → scheduled` for retries. `reschedule()` moves `publish_at` and is
+scheduled` (transient retry re-queue) and `publishing → failed → scheduled`
+(dead-letter → manual requeue). `reschedule()` moves `publish_at` and is
 deliberately **platform-immutable** — the platform is never part of the update,
 so dragging an event on the calendar can never change where it publishes.
 `claimDue()` is an atomic `UPDATE … RETURNING` that flips `scheduled → publishing`
@@ -605,11 +606,15 @@ published within ~60 s of its `publish_at`.
 **Publishing + retries.** `OutboxDispatch` (`src/outbox/dispatch.ts`) is a port
 registry mapping a platform to an `OutboxPublisher`; `buildOutboxDispatch`
 (`src/server/outbox/publishers.ts`) wires the real X and LinkedIn publishers,
-pulling tokens from the vault at publish time. Failures retry on the explicit
-schedule `OUTBOX_RETRY_SCHEDULE_MS = [1m, 5m, 30m, 2h]` (5 attempts → 4 delays);
-once exhausted the post is marked `failed` and landed in `outbox_dlq` via the
-shared `dispatchWithDlq` helper. Every transition emits a socket event
-(`outbox:published` / `outbox:failed`) so the UI updates live.
+pulling tokens from the vault at publish time. Each tick attempts every claimed
+post **once** — it never sleeps inside the tick. A transient failure is re-queued
+(`publishing → scheduled`) with `publish_at = now + OUTBOX_RETRY_SCHEDULE_MS[attempts-1]`
+(the explicit `[1m, 5m, 30m, 2h]` schedule), so the post simply reappears on a
+future due-tick and a single failing post never starves the other due posts.
+Once the schedule is exhausted (after the `2h` step) or the error is
+non-transient, the post is marked `failed` and landed in `outbox_dlq` via the
+shared `DlqRepository`. Every transition emits a socket event
+(`outbox:published` / `outbox:retry` / `outbox:failed`) so the UI updates live.
 
 **HTTP.** `createOutboxRouter` (`src/server/outbox/router.ts`) mounts under
 `/api/outbox`: list (with status/platform/time filters), `GET /post-limits`,

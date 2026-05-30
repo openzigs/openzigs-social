@@ -54,6 +54,12 @@ function toEntry(row: DlqRow): DlqEntry {
   };
 }
 
+function normalizeLimit(limit: number | undefined, fallback: number, max: number): number {
+  const value = limit ?? fallback;
+  if (!Number.isFinite(value) || value < 0) return fallback;
+  return Math.min(value, max);
+}
+
 export class DlqRepository {
   private readonly insert: Statement;
   private readonly getById: Statement;
@@ -90,7 +96,7 @@ export class DlqRepository {
   }
 
   list(opts: { platform?: string; limit?: number; offset?: number } = {}): DlqEntry[] {
-    const limit = opts.limit ?? 100;
+    const limit = normalizeLimit(opts.limit, 100, 200);
     const offset = opts.offset ?? 0;
     const rows =
       opts.platform === undefined
