@@ -66,6 +66,12 @@ export interface AppDeps {
    */
   inboxRouter?: Router;
   /**
+   * Pre-built outbox router (epic #84), mounted at `/api/outbox` when provided.
+   * Built in ./index.ts from the DB + DLQ so this factory stays decoupled from
+   * the outbox internals.
+   */
+  outboxRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -163,6 +169,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.inboxRouter) {
     api.use("/inbox", deps.inboxRouter);
+  }
+  if (deps.outboxRouter) {
+    api.use("/outbox", deps.outboxRouter);
   }
   app.use("/api", api);
 

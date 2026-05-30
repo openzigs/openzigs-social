@@ -574,6 +574,55 @@ live off the socket event.
 The connections endpoint and composer UI extend to X automatically (the platform
 list lives in `src/server/connections/router.ts`, labelled `X (Twitter)`).
 
+## 12.6 Outbox + content calendar + scheduler (#84)
+
+The outbox turns a draft into a published post on a schedule, with bounded
+retries and a dead-letter queue. It lives in `src/outbox/` (domain) and
+`src/server/outbox/` (HTTP + publisher adapters); the UI is the `/compose`,
+`/calendar`, and `/outbox` routes.
+
+**Data model.** `migrations/0007-outbox.sql` adds the `outbox` table — `id`,
+`platform`, `account_id`, `body`, `media_json`, `status`, `publish_at` (epoch
+ms), `external_id`, `attempts`, `last_error`, `published_at`, timestamps — with
+`idx_outbox_due(status, publish_at)` driving the poller's due-query. The
+dead-letter queue reuses the existing `outbox_dlq` table from `0002`.
+
+**State machine.** `OutboxRepository` (`src/outbox/repository.ts`) enforces the
+transitions `draft → scheduled → publishing → published`, with `publishing →
+failed → scheduled` for retries. `reschedule()` moves `publish_at` and is
+deliberately **platform-immutable** — the platform is never part of the update,
+so dragging an event on the calendar can never change where it publishes.
+`claimDue()` is an atomic `UPDATE … RETURNING` that flips `scheduled → publishing`
+in one statement, so two poller ticks can never double-publish the same row.
+
+**Scheduler + poller.** `OutboxScheduler` (`src/outbox/scheduler.ts`) wraps
+`node-cron` (default `*/30 * * * * *`, validated at construction) with a
+non-overlap guard so a slow tick never stacks. Each tick, `OutboxPoller`
+(`src/outbox/poller.ts`) claims due rows in batches (`config.outbox.batchSize`,
+default 25) and dispatches them. Because the cron fires every 30 s, a post is
+published within ~60 s of its `publish_at`.
+
+**Publishing + retries.** `OutboxDispatch` (`src/outbox/dispatch.ts`) is a port
+registry mapping a platform to an `OutboxPublisher`; `buildOutboxDispatch`
+(`src/server/outbox/publishers.ts`) wires the real X and LinkedIn publishers,
+pulling tokens from the vault at publish time. Failures retry on the explicit
+schedule `OUTBOX_RETRY_SCHEDULE_MS = [1m, 5m, 30m, 2h]` (5 attempts → 4 delays);
+once exhausted the post is marked `failed` and landed in `outbox_dlq` via the
+shared `dispatchWithDlq` helper. Every transition emits a socket event
+(`outbox:published` / `outbox:failed`) so the UI updates live.
+
+**HTTP.** `createOutboxRouter` (`src/server/outbox/router.ts`) mounts under
+`/api/outbox`: list (with status/platform/time filters), `GET /post-limits`,
+`GET /dlq`, create (re-validates against `validatePost`, 422 on overflow),
+update, `schedule`, `reschedule` (ignores any `platform` field), `retry`, and
+delete. A 60-req/min limiter guards all routes; illegal transitions return 409.
+The server only starts the scheduler when `config.outbox.enabled` is true.
+
+**Per-platform limits.** `src/outbox/post-limits.ts` is the single source of
+truth for character/media caps (X = 280, LinkedIn = 3000, …) and is mirrored
+verbatim in `ui/lib/compose.ts` so the composer's counter and submit guard match
+the server's validation exactly.
+
 ## 13. Security model
 
 ### Credential vault (`src/vault/`)

@@ -73,6 +73,21 @@ aren't connected (or need reconnecting) are shown disabled with a hint. Tick the
 accounts you want, write your post, and the footer shows exactly where it will
 publish.
 
+**Scheduling, the calendar, and the outbox.** The composer's character counter
+uses the **strictest** limit of the platforms you picked, so the moment X is a
+target the counter caps at 280 and the **Schedule**/**Save draft** buttons stay
+disabled until you're under the limit — no rejected posts. Pick a date and time
+and hit **Schedule**, and the post is queued (one outbox entry per platform).
+
+- **Calendar (`/calendar`).** Every scheduled post shows as an event. **Drag it
+  to a new slot** to reschedule — the new time is saved and the platform never
+  changes. The scheduler publishes each post within about a minute of its time.
+- **Outbox (`/outbox`).** See the whole queue with live status (scheduled →
+  publishing → published). If a publish fails it's retried automatically on a
+  **1m → 5m → 30m → 2h** backoff; failed posts are surfaced at the top with the
+  error and a **Retry** button. Anything that exhausts all retries lands in the
+  **dead-letter queue** so it's never silently lost.
+
 ## 5. Connecting LinkedIn, Pinterest & TikTok (Cohort B)
 
 openzigs-social can also publish to **LinkedIn**, **Pinterest**, and **TikTok**
