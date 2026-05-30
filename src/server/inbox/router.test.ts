@@ -130,6 +130,8 @@ describe("inbox router", () => {
       body: JSON.stringify({ body: "hi back" })
     });
     expect(res.status).toBe(200);
+    // Mutation endpoints are rate-limited too (60/min/IP), not just the GETs.
+    expect(res.headers.get("ratelimit-limit")).toBe("60");
     const body = (await res.json()) as { delivered: boolean };
     expect(body.delivered).toBe(true);
     expect(dmSender.sent).toHaveLength(1);
@@ -252,6 +254,7 @@ describe("inbox router", () => {
         body: JSON.stringify(rule)
       });
       expect(created.status).toBe(201);
+      expect(created.headers.get("ratelimit-limit")).toBe("60");
       const { rule: createdRule } = (await created.json()) as { rule: { id: number } };
 
       const list = await (await fetch(`${base}/api/inbox/rules`)).json();

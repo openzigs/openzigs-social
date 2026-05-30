@@ -15,9 +15,10 @@
  *
  * The reply DM-send path goes through the existing platform-service DM sender
  * registry (#144) — this router does NOT add a new send path. Every credential-
- * or DB-backed GET applies a 60-req/min/IP rate limiter (OWASP
- * `js/missing-rate-limiting`). All responses are flat JSON envelopes and never
- * echo token material.
+ * or DB-backed handler — reads AND mutations (reply / rule create/update/delete)
+ * — applies a 60-req/min/IP rate limiter (OWASP `js/missing-rate-limiting`); the
+ * reply path in particular reaches an external platform API. All responses are
+ * flat JSON envelopes and never echo token material.
  */
 import { randomUUID } from "node:crypto";
 
@@ -75,7 +76,8 @@ export function createInboxRouter(deps: InboxRouterDeps): Router {
   const rules = new RuleRepository(deps.db);
   const emit = deps.emit ?? (() => undefined);
 
-  // Mirror the connections router: 60 req/min/IP on the DB-backed reads.
+  // Mirror the connections router: 60 req/min/IP on every DB-backed handler —
+  // reads and mutations alike (the reply path also hits an external platform).
   const limiter = rateLimit({
     windowMs: 60_000,
     limit: 60,
@@ -113,7 +115,7 @@ export function createInboxRouter(deps: InboxRouterDeps): Router {
     res.status(200).json({ timestamp: new Date().toISOString(), thread });
   });
 
-  router.post("/threads/:id/read", (req: Request, res: Response) => {
+  router.post("/threads/:id/read", limiter, (req: Request, res: Response) => {
     const id = parseId(req.params.id);
     if (id === undefined) {
       res.status(400).json({ error: "invalid thread id" });
@@ -128,7 +130,7 @@ export function createInboxRouter(deps: InboxRouterDeps): Router {
     res.status(200).json({ ok: true });
   });
 
-  router.post("/threads/:id/reply", (req: Request, res: Response) => {
+  router.post("/threads/:id/reply", limiter, (req: Request, res: Response) => {
     void handleReply(req, res).catch(() => {
       if (!res.headersSent) res.status(500).json({ error: "reply failed" });
     });
@@ -216,7 +218,7 @@ export function createInboxRouter(deps: InboxRouterDeps): Router {
     res.status(200).json({ timestamp: new Date().toISOString(), rules: rules.list(true) });
   });
 
-  router.post("/rules", (req: Request, res: Response) => {
+  router.post("/rules", limiter, (req: Request, res: Response) => {
     try {
       const rule = rules.create(parseRuleInput(req.body));
       res.status(201).json({ rule });
@@ -229,7 +231,7 @@ export function createInboxRouter(deps: InboxRouterDeps): Router {
     }
   });
 
-  router.put("/rules/:id", (req: Request, res: Response) => {
+  router.put("/rules/:id", limiter, (req: Request, res: Response) => {
     const id = parseId(req.params.id);
     if (id === undefined) {
       res.status(400).json({ error: "invalid rule id" });
@@ -251,7 +253,7 @@ export function createInboxRouter(deps: InboxRouterDeps): Router {
     }
   });
 
-  router.delete("/rules/:id", (req: Request, res: Response) => {
+  router.delete("/rules/:id", limiter, (req: Request, res: Response) => {
     const id = parseId(req.params.id);
     if (id === undefined) {
       res.status(400).json({ error: "invalid rule id" });

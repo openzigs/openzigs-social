@@ -165,6 +165,16 @@ describe("evaluateCondition", () => {
     const forged = { field: "platform", op: "__proto__" } as unknown as Condition;
     expect(evaluateCondition(forged, facts)).toBe(false);
   });
+
+  it("never reads the prototype chain for a forged field", () => {
+    // A rule referencing __proto__ / constructor / prototype must resolve to
+    // undefined (no-match), never a truthy object off the prototype chain.
+    for (const field of ["__proto__", "constructor", "prototype"]) {
+      expect(evaluateCondition({ field, op: "exists" }, facts)).toBe(false);
+      expect(evaluateCondition({ field, op: "eq", value: "[object Object]" }, facts)).toBe(false);
+      expect(evaluateCondition({ field, op: "contains", value: "Object" }, facts)).toBe(false);
+    }
+  });
 });
 
 describe("evaluateRules", () => {

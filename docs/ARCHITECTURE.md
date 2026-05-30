@@ -177,7 +177,7 @@ of the #127 SocialBrain store:
 | Table | Purpose |
 |---|---|
 | `inbox_rules` | Declarative rule definitions (condition AST + actions JSON, enabled flag) |
-| `inbox_rule_firings` | **Append-only** audit trail of every rule that fired against a message (FK → `inbox_rules`, CASCADE) |
+| `inbox_rule_firings` | **Append-only** audit trail of every rule that fired against a message (FK → `inbox_rules`, **ON DELETE SET NULL** — firings are retained when a rule is deleted; migration `0006`) |
 | `inbox_thread_state` | Per-thread derived state — priority, flagged, `last_read_at` (PK/FK → `social_threads`, CASCADE) |
 | `social_messages_fts` | SQLite **FTS5** external-content index over `social_messages.body`, kept in sync by insert/update/delete triggers, powering inbox full-text search |
 

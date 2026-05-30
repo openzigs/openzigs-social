@@ -143,7 +143,7 @@ describe("RuleRepository", () => {
       expect(repo.listFirings(r.id)).toHaveLength(0);
     });
 
-    it("cascade-deletes firings when the rule is deleted", () => {
+    it("retains firing audit rows when the rule is deleted (rule_id set null)", () => {
       const r = repo.create(baseRule);
       const msg = brain.upsertMessage({
         platform: "instagram",
@@ -153,10 +153,23 @@ describe("RuleRepository", () => {
       });
       repo.applyToMessage({ message: msg });
       expect(repo.listFirings(r.id)).toHaveLength(1);
+
       repo.delete(r.id);
+
+      // The append-only audit row survives the rule deletion (migration 0006:
+      // ON DELETE SET NULL), it is just no longer linked to a live rule.
+      expect(db.prepare("SELECT COUNT(*) AS n FROM inbox_rule_firings").get()).toMatchObject({
+        n: 1
+      });
       expect(
-        db.prepare("SELECT COUNT(*) AS n FROM inbox_rule_firings WHERE rule_id = ?").get(r.id)
-      ).toMatchObject({ n: 0 });
+        db.prepare("SELECT COUNT(*) AS n FROM inbox_rule_firings WHERE rule_id IS NULL").get()
+      ).toMatchObject({ n: 1 });
+
+      // Still readable by message coordinates, with ruleId now undefined.
+      const retained = repo.listFiringsForMessage("instagram", "m3");
+      expect(retained).toHaveLength(1);
+      expect(retained[0].ruleId).toBeUndefined();
+      expect(retained[0].actions.priority).toBe("high");
     });
   });
 });

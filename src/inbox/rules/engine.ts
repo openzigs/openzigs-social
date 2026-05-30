@@ -5,8 +5,10 @@
  * {@link Facts} snapshot. SECURITY: this module contains the ENTIRE matching
  * surface and it is a fixed `switch` over a typed operator enum. There is no
  * `eval`, no `new Function`, no property access by attacker-controlled code —
- * field lookups are plain object reads on a pre-built facts map. A malicious
- * rule can never escalate beyond "tag/route/flag this message".
+ * field lookups are own-property-guarded reads on a pre-built facts map (a
+ * forged `__proto__`/`constructor` field reads undefined, never the prototype
+ * chain). A malicious rule can never escalate beyond "tag/route/flag this
+ * message".
  */
 import type {
   ComparisonCondition,
@@ -51,7 +53,10 @@ function asString(v: unknown): string | undefined {
 
 /** Evaluate one comparison leaf against the facts. */
 function evaluateComparison(cond: ComparisonCondition, facts: Facts): boolean {
-  const actual = facts[cond.field];
+  // Prototype-safe lookup: a forged field like "__proto__" / "constructor" /
+  // "prototype" must read undefined, never walk the prototype chain. Only own
+  // enumerable keys count as facts.
+  const actual = Object.hasOwn(facts, cond.field) ? facts[cond.field] : undefined;
   const expected = cond.value;
 
   switch (cond.op) {

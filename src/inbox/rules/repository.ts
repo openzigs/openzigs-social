@@ -129,7 +129,9 @@ interface RuleRow {
 
 interface FiringRow {
   id: number;
-  rule_id: number;
+  // Nullable: migration 0006 sets this to NULL when the parent rule is deleted,
+  // so the append-only audit row survives the rule it fired for.
+  rule_id: number | null;
   platform: string;
   platform_message_id: string;
   message_id: number | null;
@@ -140,7 +142,8 @@ interface FiringRow {
 /** One persisted audit row for a rule that matched a message. */
 export interface RuleFiring {
   id: number;
-  ruleId: number;
+  // Undefined once the originating rule has been deleted (ON DELETE SET NULL).
+  ruleId?: number;
   platform: string;
   platformMessageId: string;
   messageId?: number;
@@ -164,7 +167,7 @@ function toRule(row: RuleRow): RuleDefinition {
 function toFiring(row: FiringRow): RuleFiring {
   return {
     id: row.id,
-    ruleId: row.rule_id,
+    ruleId: row.rule_id ?? undefined,
     platform: row.platform,
     platformMessageId: row.platform_message_id,
     messageId: row.message_id ?? undefined,
@@ -269,7 +272,11 @@ export class RuleRepository {
     return row ? toRule(row) : undefined;
   }
 
-  /** Delete a rule (and, via FK cascade, its firings). */
+  /**
+   * Delete a rule. Its firing audit rows are RETAINED (migration 0006 set the
+   * FK to ON DELETE SET NULL), so the append-only trail survives — the firings'
+   * `rule_id` simply becomes null and they remain queryable by message.
+   */
   delete(id: number): boolean {
     return this.stmts.delete.run(id).changes > 0;
   }
