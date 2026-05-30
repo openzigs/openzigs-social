@@ -85,6 +85,20 @@ export const TikTokAppCredentialSchema = z
   })
   .strict();
 
+/**
+ * X (Twitter) app credentials for the Cohort C connector (epic #66, sub #67).
+ * OAuth 2.0 with PKCE (BYOK dev account). The client id is always present; the
+ * client secret is OPTIONAL because X supports public PKCE clients (no secret)
+ * as well as confidential clients (secret sent as HTTP Basic on token
+ * exchange). When present the secret is never logged nor echoed.
+ */
+export const TwitterAppCredentialSchema = z
+  .object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1).optional()
+  })
+  .strict();
+
 export const VaultSchema = z
   .object({
     version: z.literal(1).default(1),
@@ -94,7 +108,8 @@ export const VaultSchema = z
     meta: MetaAppCredentialSchema.optional(),
     linkedin: LinkedInAppCredentialSchema.optional(),
     pinterest: PinterestAppCredentialSchema.optional(),
-    tiktok: TikTokAppCredentialSchema.optional()
+    tiktok: TikTokAppCredentialSchema.optional(),
+    twitter: TwitterAppCredentialSchema.optional()
   })
   .strict();
 
@@ -105,6 +120,7 @@ export type MetaAppCredential = z.infer<typeof MetaAppCredentialSchema>;
 export type LinkedInAppCredential = z.infer<typeof LinkedInAppCredentialSchema>;
 export type PinterestAppCredential = z.infer<typeof PinterestAppCredentialSchema>;
 export type TikTokAppCredential = z.infer<typeof TikTokAppCredentialSchema>;
+export type TwitterAppCredential = z.infer<typeof TwitterAppCredentialSchema>;
 export type Vault = z.infer<typeof VaultSchema>;
 
 export const EMPTY_VAULT: Vault = { version: 1, providers: {}, oauth: {} };

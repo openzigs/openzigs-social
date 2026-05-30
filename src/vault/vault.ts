@@ -22,6 +22,7 @@ import {
   type ProviderCredential,
   type TelegramCredential,
   type TikTokAppCredential,
+  type TwitterAppCredential,
   type Vault,
   VaultSchema
 } from "./types.js";
@@ -210,6 +211,17 @@ export class CredentialVault {
     return vault.tiktok;
   }
 
+  /** Persist X (Twitter) app credentials for the Cohort C connector (epic #66). */
+  async setTwitter(cred: TwitterAppCredential): Promise<void> {
+    const vault = await this.load();
+    await this.persist({ ...vault, twitter: cred });
+  }
+
+  async getTwitter(): Promise<TwitterAppCredential | undefined> {
+    const vault = await this.load();
+    return vault.twitter;
+  }
+
   /** Redacted JSON of vault structure — never includes secret material. */
   toString(): string {
     const v = this.cache ?? EMPTY_VAULT;
@@ -221,7 +233,8 @@ export class CredentialVault {
       meta: v.meta ? true : false,
       linkedin: v.linkedin ? true : false,
       pinterest: v.pinterest ? true : false,
-      tiktok: v.tiktok ? true : false
+      tiktok: v.tiktok ? true : false,
+      twitter: v.twitter ? true : false
     });
   }
 }

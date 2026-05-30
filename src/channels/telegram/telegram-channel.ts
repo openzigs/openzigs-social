@@ -155,6 +155,25 @@ export class TelegramChannel {
     }
   }
 
+  /**
+   * Broadcast a plain notification to every admin chat. Used by connectors
+   * (e.g. the X write-quota guard, epic #66/#70) to push an out-of-band alert.
+   * Best-effort: per-chat send failures are logged, never thrown.
+   */
+  async notify(text: string): Promise<void> {
+    if (this.adminChatIds.length === 0) return;
+    for (const chatId of this.adminChatIds) {
+      try {
+        await this.bot.api.sendMessage(chatId, text);
+      } catch (err) {
+        this.logger?.error("telegram.notify_failed", {
+          chatId,
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+  }
+
   private buildQueueMenu(): Menu<Context> {
     const menu = new Menu<Context>(QUEUE_MENU_ID);
     menu.dynamic((_ctx, range) => {

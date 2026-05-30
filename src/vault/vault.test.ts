@@ -110,6 +110,24 @@ describe("CredentialVault", () => {
     expect(s).not.toContain("LEAKME");
   });
 
+  it("persists X (Twitter) app credentials and reads them back", async () => {
+    await ctx.vault.setTwitter({ clientId: "cid", clientSecret: "csecret" });
+    const got = await ctx.vault.getTwitter();
+    expect(got).toEqual({ clientId: "cid", clientSecret: "csecret" });
+  });
+
+  it("getTwitter returns undefined when unset", async () => {
+    expect(await ctx.vault.getTwitter()).toBeUndefined();
+  });
+
+  it("never writes the Twitter client secret in plaintext and reports presence", async () => {
+    await ctx.vault.setTwitter({ clientId: "cid", clientSecret: "TW-SUPERSECRET" });
+    const raw = await readFile(ctx.path, "utf8");
+    expect(raw).not.toContain("TW-SUPERSECRET");
+    expect(raw).not.toContain("clientSecret");
+    expect(ctx.vault.toString()).toContain('"twitter":true');
+  });
+
   it("default path lives under the user home dir", () => {
     expect(defaultVaultPath()).toMatch(/\.openzigs-social\/auth\.json$/);
   });

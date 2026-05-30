@@ -107,4 +107,31 @@ describe("config layering", () => {
     const b = getConfig();
     expect(a).toBe(b);
   });
+
+  it("applies X (Twitter) platform defaults (disabled, free tier, DM off)", () => {
+    const cfg = loadConfig({ defaultPath, userPath, env: {} });
+    expect(cfg.platform.twitter.enabled).toBe(false);
+    expect(cfg.platform.twitter.tier).toBe("free");
+    expect(cfg.platform.twitter.dmEnabled).toBe(false);
+    expect(cfg.platform.twitter.writeQuota.free).toBe(1_500);
+    expect(cfg.platform.twitter.writeQuota.basic).toBe(50_000);
+    expect(cfg.platform.twitter.warnThreshold).toBeCloseTo(0.8);
+    expect(cfg.platform.twitter.dmBudget.requests).toBe(15);
+    expect(cfg.platform.twitter.dmBudget.dailyQuota).toBe(1_440);
+  });
+
+  it("maps X (Twitter) env overrides through the alias table", () => {
+    const cfg = loadConfig({
+      defaultPath,
+      userPath,
+      env: {
+        OPENZIGS_SOCIAL_PLATFORM_TWITTER_ENABLED: "true",
+        OPENZIGS_SOCIAL_PLATFORM_TWITTER_TIER: "pro",
+        OPENZIGS_SOCIAL_PLATFORM_TWITTER_DM_ENABLED: "true"
+      }
+    });
+    expect(cfg.platform.twitter.enabled).toBe(true);
+    expect(cfg.platform.twitter.tier).toBe("pro");
+    expect(cfg.platform.twitter.dmEnabled).toBe(true);
+  });
 });

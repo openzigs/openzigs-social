@@ -238,6 +238,75 @@ export const ConfigSchema = z
               .default(5 * 60 * 1000)
           })
           .strict()
+          .default({}),
+        /**
+         * X (Twitter) v2 connector — Cohort C (#66). Opt-in; the X app client
+         * id/secret + per-account OAuth tokens live in the encrypted vault
+         * (BYOK), never here. This block carries only non-secret settings: the
+         * on/off switch, API/token hosts, the access tier (Free/Basic/Pro), the
+         * per-tier monthly write-quota caps surfaced in the model panel, the
+         * short-window rate-limit budgets (general writes + the X DM limit of
+         * 15 req/15 min, 1440/24 hr), the threshold-warning ratio, and the DM
+         * feature flag (DISABLED BY DEFAULT — only ever on for paid tiers).
+         */
+        twitter: z
+          .object({
+            enabled: booleanish.default(false),
+            /** X v2 API host base (override for testing). */
+            apiBaseUrl: z.string().url().default("https://api.twitter.com/2"),
+            /** X OAuth 2.0 token endpoint (override for testing). */
+            tokenUrl: z.string().url().default("https://api.twitter.com/2/oauth2/token"),
+            /** Access tier governing write budgets + DM availability. */
+            tier: z.enum(["free", "basic", "pro"]).default("free"),
+            /**
+             * Inbound + outbound DM. Off by default and force-disabled on the
+             * Free tier regardless of this flag (X gates DM behind paid access).
+             */
+            dmEnabled: booleanish.default(false),
+            /** Per-tier monthly X API write-quota caps (posts/replies/DMs). */
+            writeQuota: z
+              .object({
+                free: z.coerce.number().int().positive().default(1_500),
+                basic: z.coerce.number().int().positive().default(50_000),
+                pro: z.coerce.number().int().positive().default(1_000_000)
+              })
+              .strict()
+              .default({}),
+            /** Utilisation ratio in (0,1] at which to warn the user. */
+            warnThreshold: z.coerce.number().min(0.1).max(1).default(0.8),
+            /** General write rate-limit budget (token bucket). */
+            budget: z
+              .object({
+                requests: z.coerce.number().int().positive().default(50),
+                windowMs: z.coerce
+                  .number()
+                  .int()
+                  .positive()
+                  .default(15 * 60 * 1000)
+              })
+              .strict()
+              .default({}),
+            /** X DM rate-limit: 15 requests / 15 min per user, 1440 / 24 hr. */
+            dmBudget: z
+              .object({
+                requests: z.coerce.number().int().positive().default(15),
+                windowMs: z.coerce
+                  .number()
+                  .int()
+                  .positive()
+                  .default(15 * 60 * 1000),
+                dailyQuota: z.coerce.number().int().positive().default(1_440)
+              })
+              .strict()
+              .default({}),
+            /** Polling cadence (ms) for DM ingest + tweet analytics. */
+            pollIntervalMs: z.coerce
+              .number()
+              .int()
+              .positive()
+              .default(5 * 60 * 1000)
+          })
+          .strict()
           .default({})
       })
       .strict()

@@ -31,7 +31,10 @@ const ENV_MAP: Record<string, string> = {
   OPENZIGS_SOCIAL_PLATFORM_META_ENABLED: "platform.meta.enabled",
   OPENZIGS_SOCIAL_PLATFORM_LINKEDIN_ENABLED: "platform.linkedin.enabled",
   OPENZIGS_SOCIAL_PLATFORM_PINTEREST_ENABLED: "platform.pinterest.enabled",
-  OPENZIGS_SOCIAL_PLATFORM_TIKTOK_ENABLED: "platform.tiktok.enabled"
+  OPENZIGS_SOCIAL_PLATFORM_TIKTOK_ENABLED: "platform.tiktok.enabled",
+  OPENZIGS_SOCIAL_PLATFORM_TWITTER_ENABLED: "platform.twitter.enabled",
+  OPENZIGS_SOCIAL_PLATFORM_TWITTER_TIER: "platform.twitter.tier",
+  OPENZIGS_SOCIAL_PLATFORM_TWITTER_DM_ENABLED: "platform.twitter.dmEnabled"
 };
 
 type Json = Record<string, unknown>;
