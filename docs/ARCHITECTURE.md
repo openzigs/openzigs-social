@@ -105,6 +105,9 @@ Layout under the data directory:
 | `connectors/meta/` | Cohort A connectors: Instagram + Facebook Pages + Threads via Meta Graph API `v25.0`, built on the #127 ports (epic #53) |
 | `connectors/{linkedin,pinterest,tiktok}/` | Cohort B connectors: LinkedIn (no DM) + Pinterest + TikTok (PRIVATE-only), built on the #127 ports (epic #60) |
 | `connectors/twitter/` | Cohort C connector: X (Twitter) v2 with per-tier write-quota tracking + DM gated to paid tiers, built on the #127 ports (epic #66) |
+| `inbox/rules/` | Declarative comment **rule engine** — no-`eval` condition AST evaluator, repository, and append-only firing audit trail (epic #71, #74) |
+| `inbox/repository.ts` + `inbox/platform-limits.ts` | Unified thread/message read model (priority+recency sort, unread counts, FTS5 search) and per-platform reply limits (LinkedIn comments-only) (epic #71, #76/#77) |
+| `server/inbox/router.ts` | `/api/inbox/*` — threads, thread detail, mark-read, reply (via the #144 DM dispatcher), rules CRUD, firings, platform-limits; consumes the #143 SocialBrain store (epic #71) |
 | `server/connections/router.ts` | `GET /api/connections` — per-platform connect/needs-reconsent status (never echoes tokens) (#53) |
 
 ## 5. UI map (`ui/`)
@@ -119,7 +122,9 @@ It runs on port `3001` in development and talks to the Node server (port
 | `app/layout.tsx` | Root layout; injects the no-FOUC theme script and wraps the tree in `Providers` + `TopNav` |
 | `app/providers.tsx` | Client providers: TanStack Query, `ThemeProvider`, the Socket.IO client, and the toast `Toaster`; exposes `useSocket()` |
 | `app/page.tsx` | Dashboard shell — KPI card grid + quick-actions dialog |
-| `app/{inbox,compose,calendar,analytics,contacts,settings}/page.tsx` | Route placeholders for the primary nav destinations |
+| `app/{compose,calendar,analytics,contacts,settings}/page.tsx` | Route placeholders for the primary nav destinations |
+| `app/inbox/page.tsx` + `components/inbox/` | Unified inbox: filter bar + full-text search, live thread list (badges/unread/priority), thread detail with DM/Comments tabs + reply composer; LinkedIn DM section hidden (epic #71, #76/#77) |
+| `lib/inbox.ts` | Inbox client: thread/reply fetchers, per-platform limits mirror, and React Query hooks subscribed to `inbox:*` socket events (epic #71) |
 | `app/compose/page.tsx` | Composer: per-account publish-target picker + post body (epic #53) |
 | `components/compose/publish-targets.tsx` | Publish-target checkbox list driven by `GET /api/connections` (#53) |
 | `lib/connections.ts` | `fetchConnections()` client for `GET /api/connections` (#53) |
@@ -165,6 +170,16 @@ share:
 `0003-meta-insights.sql` (epic #53) adds `platform_insights_raw` — raw
 per-object metric snapshots (`UNIQUE (platform, object_id, metric, captured_for)`)
 written by the Facebook/Threads insights pollers via `InsightsRepository`.
+
+`0005-inbox-rule-engine.sql` (epic #71) adds the inbox read/rule tables on top
+of the #127 SocialBrain store:
+
+| Table | Purpose |
+|---|---|
+| `inbox_rules` | Declarative rule definitions (condition AST + actions JSON, enabled flag) |
+| `inbox_rule_firings` | **Append-only** audit trail of every rule that fired against a message (FK → `inbox_rules`, CASCADE) |
+| `inbox_thread_state` | Per-thread derived state — priority, flagged, `last_read_at` (PK/FK → `social_threads`, CASCADE) |
+| `social_messages_fts` | SQLite **FTS5** external-content index over `social_messages.body`, kept in sync by insert/update/delete triggers, powering inbox full-text search |
 
 ## 7. Copilot SDK runtime + smart router + privacy mode
 

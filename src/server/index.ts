@@ -41,6 +41,7 @@ import { registerTikTokConnectors } from "../connectors/tiktok/index.js";
 import { registerTwitterConnectors } from "../connectors/twitter/index.js";
 import { tierWriteQuota } from "../connectors/twitter/tiers.js";
 import { createTwitterRouter } from "./twitter/router.js";
+import { createInboxRouter } from "./inbox/router.js";
 import { createApp, type ReadinessReport } from "./app.js";
 import { metrics as defaultMetrics, type Metrics } from "./metrics.js";
 import { createSocketServer } from "./socket.js";
@@ -332,13 +333,25 @@ export async function startServer(): Promise<StartedServer> {
       })
     : undefined;
 
+  // Unified inbox router (epic #71) — aggregation, rule engine, and replies.
+  // The reply DM-send path delegates to the platform-service DM sender registry
+  // (#144); live updates ride the same deferred `quotaSink` as the X guard so
+  // `inbox:*` events reach the socket once it's wired below.
+  const inboxRouter = createInboxRouter({
+    db,
+    brain: new SocialBrainRepository(db),
+    dmSender: platform.dmSenders,
+    emit: (event, payload) => quotaSink.emit?.(event, payload)
+  });
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
     vault,
     uiOrigin: config.server.uiOrigin,
     platform: { oauthRouter, webhookRouter },
-    twitterRouter
+    twitterRouter,
+    inboxRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {

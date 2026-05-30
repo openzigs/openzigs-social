@@ -166,6 +166,46 @@ incurring API overage) until the next month rolls over.
 * **Polling-only inbound.** v1 does not register an X webhook; inbound DMs and
   analytics are gathered by polling.
 
+## 7. The unified inbox
+
+The **Inbox** (`/inbox`) brings every platform's direct messages and comments
+into a single, prioritised list so you never have to tab between apps.
+
+* **One list, every platform.** Each conversation row shows a platform badge,
+  the contact, a message preview, an unread count, and a priority tag. Threads
+  are sorted by priority first (set by your rules — see below) then by recency,
+  so the conversations that matter surface at the top.
+* **Filters + full-text search.** Use the platform selector to focus on a single
+  network, and the search box to full-text search across message bodies. Both
+  narrow the list instantly.
+* **Reading a thread.** Click a conversation to open it. Direct messages and
+  comments are split into separate tabs. Opening a thread marks it read. The
+  list updates live as new messages arrive.
+* **Replying.** The reply composer enforces the selected platform's character
+  limit for the active surface (DM vs comment) before you can send. Replies to
+  DM-capable platforms are dispatched through the same DM pipeline used
+  elsewhere in the app; comment replies are recorded against the thread.
+
+### Comment rules
+
+Inbox **rules** let you triage incoming comments and DMs automatically. A rule
+is a declarative set of conditions (for example: platform is `instagram`, the
+body contains "refund", or the author has more than 10,000 followers) paired
+with actions: set a **priority**, add **tags**, **flag** the thread, or **route**
+it. Rules are evaluated safely — there is no scripting or code execution — and
+the highest-priority matching rule wins. **Every rule firing is recorded in an
+append-only audit trail**, so you can always see exactly which rule acted on a
+message and why.
+
+### Known limitations
+
+* **LinkedIn — no direct messages.** Consistent with the LinkedIn connector
+  limitation above, the inbox hides the DM section entirely for LinkedIn
+  conversations and shows the note: *"LinkedIn DMs require the Compliance
+  Partner Program — not supported in v1."* You can still read and reply to
+  LinkedIn comments. The same DM-hidden behaviour applies to other
+  comments-only platforms (Threads, YouTube).
+
 ## 8. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your
