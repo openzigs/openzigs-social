@@ -10,6 +10,7 @@ export const NAV_LINKS = [
   { name: "Outbox", path: "/outbox" },
   { name: "Analytics", path: "/analytics" },
   { name: "Contacts", path: "/contacts" },
+  { name: "Onboarding", path: "/onboarding" },
   { name: "Settings", path: "/settings" }
 ] as const;
 
