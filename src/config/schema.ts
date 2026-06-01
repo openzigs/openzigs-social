@@ -351,6 +351,43 @@ export const ConfigSchema = z
         voiceThreshold: z.coerce.number().min(0).max(1).default(0.8)
       })
       .strict()
+      .default({}),
+    /**
+     * Light CRM (epic #90). Deterministic lead-scoring weights/thresholds for
+     * the contacts view. No ML/network: the scorer blends engagement frequency,
+     * a lexicon sentiment heuristic, and log-scaled follower count.
+     */
+    crm: z
+      .object({
+        leadScore: z
+          .object({
+            /** Sliding window (days) for the engagement count. */
+            engagementWindowDays: z.coerce.number().int().positive().default(7),
+            /**
+             * Engagement count that saturates the engagement signal. With the
+             * default weights this is the boundary at which a contact tips into
+             * the `top` bucket (epic #92 acceptance criterion).
+             */
+            engagementTarget: z.coerce.number().int().positive().default(30),
+            /** Follower count that saturates the (log-scaled) audience signal. */
+            followerTarget: z.coerce.number().int().positive().default(100_000),
+            /** Weight applied to the engagement signal. */
+            weightEngagement: z.coerce.number().min(0).max(1).default(0.7),
+            /** Weight applied to the sentiment signal. */
+            weightSentiment: z.coerce.number().min(0).max(1).default(0.1),
+            /** Weight applied to the audience signal. */
+            weightFollower: z.coerce.number().min(0).max(1).default(0.2),
+            /** Inclusive score boundary for the `top` bucket. */
+            topThreshold: z.coerce.number().min(0).max(1).default(0.75),
+            /** Inclusive score boundary for the `high` bucket. */
+            highThreshold: z.coerce.number().min(0).max(1).default(0.5),
+            /** Inclusive score boundary for the `medium` bucket. */
+            mediumThreshold: z.coerce.number().min(0).max(1).default(0.25)
+          })
+          .strict()
+          .default({})
+      })
+      .strict()
       .default({})
   })
   .strict();
