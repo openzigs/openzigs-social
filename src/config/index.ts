@@ -46,7 +46,10 @@ const ENV_MAP: Record<string, string> = {
   OPENZIGS_SOCIAL_ANALYTICS_SMTP_SECURE: "analytics.smtp.secure",
   OPENZIGS_SOCIAL_ANALYTICS_SMTP_USER: "analytics.smtp.user",
   OPENZIGS_SOCIAL_ANALYTICS_SMTP_FROM: "analytics.smtp.from",
-  OPENZIGS_SOCIAL_ANALYTICS_SMTP_TO: "analytics.smtp.to"
+  OPENZIGS_SOCIAL_ANALYTICS_SMTP_TO: "analytics.smtp.to",
+  OPENZIGS_SOCIAL_CRM_ENGAGEMENT_WINDOW_DAYS: "crm.leadScore.engagementWindowDays",
+  OPENZIGS_SOCIAL_CRM_ENGAGEMENT_TARGET: "crm.leadScore.engagementTarget",
+  OPENZIGS_SOCIAL_CRM_FOLLOWER_TARGET: "crm.leadScore.followerTarget"
 };
 
 type Json = Record<string, unknown>;

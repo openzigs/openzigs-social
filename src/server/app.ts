@@ -84,6 +84,12 @@ export interface AppDeps {
    */
   analyticsRouter?: Router;
   /**
+   * Pre-built Light CRM router (epic #90), mounted at `/api/contacts` when
+   * provided. Built in ./index.ts from the CRM repository so this factory stays
+   * decoupled from the SQLite internals.
+   */
+  contactsRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -195,6 +201,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.analyticsRouter) {
     api.use("/analytics", deps.analyticsRouter);
+  }
+  if (deps.contactsRouter) {
+    api.use("/contacts", deps.contactsRouter);
   }
   app.use("/api", api);
 

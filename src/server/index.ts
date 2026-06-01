@@ -48,6 +48,8 @@ import { createAnalyticsRouter } from "./analytics/router.js";
 import { AnalyticsCacheRepository } from "../analytics/repository.js";
 import { AnalyticsAggregatorScheduler, WeeklyDigestScheduler } from "../analytics/scheduler.js";
 import { createMailer } from "../analytics/mailer.js";
+import { createContactsRouter } from "./crm/router.js";
+import { CrmRepository } from "../crm/index.js";
 import { BrandVoiceRepository } from "../personality/rulebook-repository.js";
 import { AutoReplyAuditRepository } from "../routing/audit-repository.js";
 import { AutoReplyPipeline } from "../routing/pipeline.js";
@@ -435,6 +437,15 @@ export async function startServer(): Promise<StartedServer> {
   const analyticsRepo = new AnalyticsCacheRepository(db);
   const analyticsRouter = createAnalyticsRouter({ repo: analyticsRepo });
 
+  // Light CRM (epic #90): contacts list/detail, lead scoring, and merges. The
+  // repository reads the live lead-score weights so a config reload is honoured;
+  // merge events ride the same deferred `quotaSink` emit as the inbox/outbox.
+  const crmRepository = new CrmRepository(db, () => config.crm.leadScore);
+  const contactsRouter = createContactsRouter({
+    repo: crmRepository,
+    emit: (event, payload) => quotaSink.emit?.(event, payload)
+  });
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
@@ -445,7 +456,8 @@ export async function startServer(): Promise<StartedServer> {
     inboxRouter,
     outboxRouter,
     autoReplyRouter,
-    analyticsRouter
+    analyticsRouter,
+    contactsRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {

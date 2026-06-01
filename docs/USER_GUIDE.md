@@ -268,6 +268,60 @@ the final text, the scores, the decision, the model, and the timestamp. It
 survives restarts, is searchable by conversation and time range, and the
 underlying data is removed when you exercise your right-to-delete for a contact.
 
+## 8.5 Light CRM — contacts, lead scoring & merging
+
+The **Contacts** page (`/contacts`) turns the people you talk to across every
+connected platform into a single, scored, mergeable address book. It builds
+automatically from your inbox — there is nothing to import.
+
+### The contact list
+
+Every social contact you've received a message from appears in the list with:
+
+* a **lead-score badge** — `Top`, `High`, `Medium`, or `Low`,
+* the **platforms** they reach you on (one badge per linked account), and
+* their **engagement in the last 7 days**.
+
+Selecting a contact opens the detail pane on the right.
+
+### How lead scoring works
+
+The score is **deterministic and computed entirely on your machine** — no AI
+calls, no data leaves your device. It blends three signals:
+
+* **Engagement frequency** — how many messages they've sent in a sliding window
+  (7 days by default), the largest factor.
+* **Sentiment** — a simple positive/negative word heuristic over their recent
+  messages.
+* **Follower count** — their audience size, with diminishing returns so a huge
+  account doesn't drown out everything else.
+
+As a rule of thumb, a contact who sends you **30 or more messages in the last 7
+days** lands in the **Top** bucket. You can tune the window, targets, and
+weights under `crm.leadScore` in your config (see §12).
+
+### Conversation history
+
+The detail pane shows a single **conversation timeline** for the contact, merged
+in time order across all of their platforms — so a DM on Instagram and a comment
+reply on LinkedIn read as one continuous thread. Inbound and outbound messages
+are styled differently so you can follow the back-and-forth at a glance.
+
+### Merging duplicate people
+
+The same person often shows up as separate contacts on different platforms. When
+two contacts share an **email address** (discovered from their profile or
+messages), they appear in the **Suggested merges** panel as a pair.
+
+Click **Merge** to fold them into one identity. The merge:
+
+* keeps **all** the conversation history from both (nothing is deleted),
+* combines their email, follower count, and display name, and
+* records the merge so there's an audit trail.
+
+Merges happen instantly and the list updates live. The first contact in a
+suggested pair becomes the surviving identity; the other is folded into it.
+
 ## 9. Analytics dashboard
 
 The **Analytics** tab turns the metrics your connected platforms report into a
