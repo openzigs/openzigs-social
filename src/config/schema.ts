@@ -328,6 +328,29 @@ export const ConfigSchema = z
         batchSize: z.coerce.number().int().positive().max(500).default(25)
       })
       .strict()
+      .default({}),
+    autoReply: z
+      .object({
+        /**
+         * Hybrid-posture master switch (#78/#81). When off the pipeline still
+         * scores drafts and writes the audit trail, but never auto-sends — every
+         * draft is queued for human approval regardless of score.
+         */
+        enabled: booleanish.default(false),
+        /**
+         * Minimum model-confidence (0..1) for an auto-send. The draft is
+         * auto-sent only when confidence ≥ this AND voiceMatch ≥ voiceThreshold.
+         * Default 0.85 (epic #78 worked example). Boundary is inclusive.
+         */
+        confidenceThreshold: z.coerce.number().min(0).max(1).default(0.85),
+        /**
+         * Minimum brand-voice match (0..1) from the Linguistic Profiler for an
+         * auto-send. Default 0.80. A banned-word hit vetoes the score to 0, so a
+         * banned word always forces the draft into the approval queue.
+         */
+        voiceThreshold: z.coerce.number().min(0).max(1).default(0.8)
+      })
+      .strict()
       .default({})
   })
   .strict();

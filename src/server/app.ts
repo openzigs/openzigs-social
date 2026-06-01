@@ -72,6 +72,12 @@ export interface AppDeps {
    */
   outboxRouter?: Router;
   /**
+   * Pre-built auto-reply / brand-voice router (epic #78), mounted at
+   * `/api/auto-reply` when provided. Built in ./index.ts from the rulebook +
+   * audit repos + pipeline so this factory stays decoupled from the internals.
+   */
+  autoReplyRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -102,7 +108,12 @@ export function createCorsMiddleware(allowedOrigin: string) {
     const origin = req.headers.origin;
     if (origin === allowedOrigin) {
       res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      // Single source of truth for the methods the API actually serves across
+      // every mounted router. PUT is used by the brand-voice rulebook (#78) and
+      // inbox rule updates (#71); DELETE by inbox rule removal (#71). Keep this
+      // list in sync when a router adds a new verb — the CORS layer is global,
+      // so an omitted method silently breaks cross-origin preflight.
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
       res.setHeader("Access-Control-Max-Age", "600");
     }
@@ -172,6 +183,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.outboxRouter) {
     api.use("/outbox", deps.outboxRouter);
+  }
+  if (deps.autoReplyRouter) {
+    api.use("/auto-reply", deps.autoReplyRouter);
   }
   app.use("/api", api);
 

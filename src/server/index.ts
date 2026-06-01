@@ -43,6 +43,10 @@ import { tierWriteQuota } from "../connectors/twitter/tiers.js";
 import { createTwitterRouter } from "./twitter/router.js";
 import { createInboxRouter } from "./inbox/router.js";
 import { createOutboxRouter } from "./outbox/router.js";
+import { createAutoReplyRouter } from "./auto-reply/router.js";
+import { BrandVoiceRepository } from "../personality/rulebook-repository.js";
+import { AutoReplyAuditRepository } from "../routing/audit-repository.js";
+import { AutoReplyPipeline } from "../routing/pipeline.js";
 import { buildOutboxDispatch } from "./outbox/publishers.js";
 import { OutboxPoller } from "../outbox/poller.js";
 import { OutboxRepository } from "../outbox/repository.js";
@@ -390,6 +394,37 @@ export async function startServer(): Promise<StartedServer> {
     }
   });
 
+  // Auto-reply / brand-voice pipeline (epic #78). The Linguistic Profiler scores
+  // drafts against the workspace rulebook; the Hybrid posture auto-sends when
+  // both scores clear their thresholds, otherwise queues for approval. Every
+  // decision is written to the SQLite audit trail. Delivery rides the same
+  // deferred `quotaSink` emit as the inbox/outbox so the UI sees live updates;
+  // the concrete connector send is wired by the inbox reply path, so here the
+  // sender records the intent on the socket bus.
+  const autoReplyRulebook = new BrandVoiceRepository(db);
+  const autoReplyAudit = new AutoReplyAuditRepository(db);
+  const autoReplyThresholds = () => ({
+    confidenceThreshold: config.autoReply.confidenceThreshold,
+    voiceThreshold: config.autoReply.voiceThreshold
+  });
+  const autoReplyPipeline = new AutoReplyPipeline({
+    rulebook: autoReplyRulebook,
+    audit: autoReplyAudit,
+    thresholds: autoReplyThresholds,
+    enabled: () => config.autoReply.enabled,
+    send: (text, ctx) => {
+      quotaSink.emit?.("autoReply:deliver", { ...ctx, text });
+    },
+    emit: (event, payload) => quotaSink.emit?.(event, payload)
+  });
+  const autoReplyRouter = createAutoReplyRouter({
+    rulebook: autoReplyRulebook,
+    audit: autoReplyAudit,
+    pipeline: autoReplyPipeline,
+    thresholds: autoReplyThresholds,
+    enabled: () => config.autoReply.enabled
+  });
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
@@ -398,7 +433,8 @@ export async function startServer(): Promise<StartedServer> {
     platform: { oauthRouter, webhookRouter },
     twitterRouter,
     inboxRouter,
-    outboxRouter
+    outboxRouter,
+    autoReplyRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {
