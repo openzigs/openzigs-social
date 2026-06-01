@@ -1,12 +1,12 @@
 # Graph Report - openzigs-social  (2026-06-01)
 
 ## Corpus Check
-- 382 files · ~174,487 words
+- 396 files · ~179,624 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1520 nodes · 2199 edges · 45 communities detected
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 109 edges (avg confidence: 0.8)
+- 1561 nodes · 2264 edges · 59 communities detected
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 111 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -48,155 +48,169 @@
 - [[_COMMUNITY_Community 35|Community 35]]
 - [[_COMMUNITY_Community 36|Community 36]]
 - [[_COMMUNITY_Community 37|Community 37]]
-- [[_COMMUNITY_Community 38|Community 38]]
 - [[_COMMUNITY_Community 39|Community 39]]
 - [[_COMMUNITY_Community 40|Community 40]]
 - [[_COMMUNITY_Community 41|Community 41]]
+- [[_COMMUNITY_Community 42|Community 42]]
 - [[_COMMUNITY_Community 43|Community 43]]
+- [[_COMMUNITY_Community 44|Community 44]]
+- [[_COMMUNITY_Community 45|Community 45]]
 - [[_COMMUNITY_Community 46|Community 46]]
-- [[_COMMUNITY_Community 48|Community 48]]
+- [[_COMMUNITY_Community 47|Community 47]]
+- [[_COMMUNITY_Community 50|Community 50]]
+- [[_COMMUNITY_Community 51|Community 51]]
+- [[_COMMUNITY_Community 52|Community 52]]
+- [[_COMMUNITY_Community 53|Community 53]]
+- [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 59|Community 59]]
+- [[_COMMUNITY_Community 60|Community 60]]
+- [[_COMMUNITY_Community 61|Community 61]]
+- [[_COMMUNITY_Community 62|Community 62]]
+- [[_COMMUNITY_Community 63|Community 63]]
+- [[_COMMUNITY_Community 64|Community 64]]
+- [[_COMMUNITY_Community 65|Community 65]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `CredentialVault` - 25 edges
-2. `startServer()` - 23 edges
-3. `CrmRepository` - 18 edges
-4. `assertSafeUrl()` - 16 edges
-5. `OutboxRepository` - 16 edges
-6. `TranscriptManager` - 14 edges
-7. `HandoffManager` - 12 edges
-8. `TelegramChannel` - 12 edges
-9. `SocialBrainRepository` - 12 edges
-10. `SetupPage` - 11 edges
+2. `startServer()` - 24 edges
+3. `assertSafeUrl()` - 16 edges
+4. `OutboxRepository` - 16 edges
+5. `TranscriptManager` - 14 edges
+6. `HandoffManager` - 12 edges
+7. `TelegramChannel` - 12 edges
+8. `SocialBrainRepository` - 12 edges
+9. `SetupPage` - 11 edges
+10. `AnalyticsCacheRepository` - 11 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `dmUnsupportedNotice()` --calls--> `limitsFor()`  [INFERRED]
   ui/components/inbox/thread-detail.tsx → src/inbox/platform-limits.ts
 - `detail()` --calls--> `limitsFor()`  [INFERRED]
   ui/components/inbox/thread-detail.test.tsx → src/inbox/platform-limits.ts
-- `toast()` --calls--> `onEventDrop()`  [INFERRED]
-  ui/components/ui/use-toast.ts → ui/components/calendar/calendar-view.tsx
 - `handleVerify()` --calls--> `verifyTelegram()`  [INFERRED]
   ui/components/setup/telegram-step.tsx → src/server/setup/telegram-verify.ts
 - `preview()` --calls--> `postLimitsFor()`  [INFERRED]
   ui/components/calendar/calendar-view.tsx → src/outbox/post-limits.ts
+- `startServer()` --calls--> `createInboxRouter()`  [INFERRED]
+  src/server/index.ts → src/server/inbox/router.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.03
-Nodes (40): auditDir(), dbPath(), defaultDataDir(), logsDir(), resolveDataDir(), sessionsDir(), userConfigPath(), createConnectionsRouter() (+32 more)
+Cohesion: 0.02
+Nodes (52): getDb(), openDb(), InsightsRepository, parseMetadata(), toReading(), IgContainerNotReadyError, callbackUrl(), registerLinkedInConnectors() (+44 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.03
-Nodes (26): InstagramDmSender, IgContainerNotReadyError, appendParams(), MetaGraphClient, MetaGraphError, safeParse(), fetchImpl(), jsonResponse() (+18 more)
-
-### Community 2 - "Community 2"
 Cohesion: 0.04
 Nodes (39): DmDispatcher, isDmSupported(), limitsFor(), validateReply(), buildMatchExpression(), InboxRepository, messageKind(), parseMetadata() (+31 more)
 
-### Community 3 - "Community 3"
+### Community 2 - "Community 2"
 Cohesion: 0.03
-Nodes (34): PinterestAnalyticsPoller, utcDay(), PinterestDispatcher, callbackUrl(), registerPinterestConnectors(), basicAuth(), PinterestAppNotConfiguredError, PinterestOAuthExchanger (+26 more)
+Nodes (41): assertNoDmScopes(), LinkedInAppNotConfiguredError, LinkedInDmScopeError, LinkedInOAuthExchanger, readToken(), build(), fakeDlq(), grantedBroker() (+33 more)
+
+### Community 3 - "Community 3"
+Cohesion: 0.04
+Nodes (31): aggregatePostMetrics(), followersByPlatform(), parseDayKeyMs(), rollupEngagement(), dayKey(), insight(), utcDayKey(), withinWindow() (+23 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.04
-Nodes (27): build(), fakeDlq(), grantingBroker(), TwitterAnalyticsPoller, utcDay(), TwitterCreditTracker, utcMonth(), TwitterDispatcher (+19 more)
+Nodes (12): SocialDmSenderRegistry, AdminAcl, createAclMiddleware(), normalizeChatId(), buildApprovalCallbackData(), buildApprovalKeyboard(), escapeHtml(), renderApprovalMessage() (+4 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
-Nodes (13): SocialDmSenderRegistry, AdminAcl, createAclMiddleware(), normalizeChatId(), buildApprovalCallbackData(), buildApprovalKeyboard(), escapeHtml(), renderApprovalMessage() (+5 more)
+Nodes (15): PrivacyController, SessionManager, estimateTokens(), SmartRouter, CopilotWrapper, fetchImpl(), jsonResponse(), AnthropicProvider (+7 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.05
-Nodes (24): LinkedInAnalyticsPoller, build(), fakeClient(), passthroughDispatcher(), utcDay(), LinkedInCommentPoller, LinkedInDispatcher, callbackUrl() (+16 more)
-
-### Community 7 - "Community 7"
-Cohesion: 0.04
-Nodes (13): PrivacyController, SessionManager, estimateTokens(), SmartRouter, CopilotWrapper, AnthropicProvider, CopilotProvider, createProvider() (+5 more)
-
-### Community 8 - "Community 8"
 Cohesion: 0.06
 Nodes (20): createAutoReplyRouter(), parseRulebook(), toStringList(), buildVocabulary(), clamp01(), findBannedHits(), scoreVoice(), tokenize() (+12 more)
 
-### Community 9 - "Community 9"
+### Community 7 - "Community 7"
 Cohesion: 0.05
-Nodes (16): TikTokDispatcher, build(), fakeClient(), passthroughDispatcher(), TikTokDisplayPoller, utcDay(), readToken(), TikTokAppNotConfiguredError (+8 more)
+Nodes (14): createConnectionsRouter(), listen(), mount(), FakeDmSender, createApp(), createCorsMiddleware(), Metrics, zero() (+6 more)
+
+### Community 8 - "Community 8"
+Cohesion: 0.06
+Nodes (17): build(), fakeClient(), passthroughDispatcher(), TikTokDisplayPoller, utcDay(), callbackUrl(), registerTikTokConnectors(), readToken() (+9 more)
+
+### Community 9 - "Community 9"
+Cohesion: 0.08
+Nodes (8): decrypt(), deriveKey(), encrypt(), RefreshRegistry, TokenRefreshScheduler, CredentialVault, defaultKeyMaterial(), defaultVaultPath()
 
 ### Community 10 - "Community 10"
-Cohesion: 0.05
-Nodes (16): appliedVersions(), ensureMigrationsTable(), loadMigrations(), migrate(), MetaDispatcher, errorMessage(), OutboxPoller, OutboxScheduler (+8 more)
+Cohesion: 0.07
+Nodes (9): canTransition(), IllegalTransitionError, OutboxNotFoundError, OutboxRepository, parseMedia(), toPost(), createOutboxRouter(), DlqRepository (+1 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.08
-Nodes (9): vaultPath(), decrypt(), deriveKey(), encrypt(), RefreshRegistry, TokenRefreshScheduler, CredentialVault, defaultKeyMaterial() (+1 more)
+Nodes (22): deepMerge(), defaultConfigPath(), envLayer(), getConfig(), isObject(), loadConfig(), readJsonIfPresent(), setPath() (+14 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.08
-Nodes (17): collectStrings(), discoverEmail(), discoverFollowerCount(), extractEmails(), normalizeEmail(), bucketFor(), clamp01(), scoreLead() (+9 more)
+Cohesion: 0.06
+Nodes (17): appliedVersions(), ensureMigrationsTable(), loadMigrations(), migrate(), LinkedInDispatcher, MetaDispatcher, errorMessage(), OutboxPoller (+9 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.07
-Nodes (11): onEventDrop(), preview(), postLimitsFor(), validatePost(), canTransition(), IllegalTransitionError, OutboxNotFoundError, OutboxRepository (+3 more)
+Nodes (19): useSocket(), onEventDrop(), preview(), submit(), toEpoch(), InboxView(), PlatformBadge(), badgeMetaFor() (+11 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.07
-Nodes (20): useSocket(), submit(), toEpoch(), ContactsView(), InboxView(), PlatformBadge(), useContact(), useContacts() (+12 more)
+Cohesion: 0.1
+Nodes (7): ConnectorRegistry, createOAuthRouter(), isSafeRelativePath(), listen(), mount(), OAuthStateStore, safeEqual()
 
 ### Community 15 - "Community 15"
 Cohesion: 0.1
-Nodes (7): ConnectorRegistry, createOAuthRouter(), isSafeRelativePath(), listen(), mount(), OAuthStateStore, safeEqual()
+Nodes (8): build(), fakeDlq(), grantedBroker(), appendQuery(), PinterestApiError, PinterestRestClient, safeParse(), toApiError()
 
 ### Community 16 - "Community 16"
 Cohesion: 0.11
 Nodes (9): WebhookEventStore, WebhookHandlerRegistry, computeSignature(), normalizeSignature(), verifySignature(), createWebhookRouter(), listen(), mount() (+1 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.11
-Nodes (6): NoPublisherError, OutboxDispatch, buildOutboxDispatch(), linkedinAdapter(), twitterAdapter(), TwitterPublisher
-
-### Community 18 - "Community 18"
 Cohesion: 0.22
 Nodes (13): createPost(), deletePost(), fetchOutbox(), fetchOutboxDlq(), readError(), reschedulePost(), retryPost(), schedulePost() (+5 more)
 
-### Community 19 - "Community 19"
-Cohesion: 0.15
-Nodes (5): clone(), ContactsPage, escapeRegExp(), mergeDetails(), sortTimeline()
+### Community 18 - "Community 18"
+Cohesion: 0.25
+Nodes (11): fetchEngagementSeries(), fetchHeatmap(), fetchSummary(), fetchTopPosts(), readError(), useAnalyticsLiveRefresh(), useAnalyticsSummary(), useEngagementSeries() (+3 more)
 
-### Community 20 - "Community 20"
+### Community 19 - "Community 19"
 Cohesion: 0.21
 Nodes (7): fetchAuditLog(), fetchAutoReplyConfig(), fetchRulebook(), readError(), resolveAudit(), saveRulebook(), scoreDraft()
 
-### Community 21 - "Community 21"
+### Community 20 - "Community 20"
 Cohesion: 0.2
 Nodes (4): cloneRulebook(), normalizeList(), normalizeRulebook(), SettingsPage
+
+### Community 21 - "Community 21"
+Cohesion: 0.14
+Nodes (1): AnalyticsPage
 
 ### Community 22 - "Community 22"
 Cohesion: 0.19
 Nodes (2): ApprovalQueue, ApprovalQueueFullError
 
 ### Community 23 - "Community 23"
+Cohesion: 0.3
+Nodes (1): TranscriptManager
+
+### Community 24 - "Community 24"
 Cohesion: 0.21
 Nodes (1): HandoffManager
 
-### Community 24 - "Community 24"
+### Community 25 - "Community 25"
 Cohesion: 0.23
 Nodes (9): clampStep(), getWizardSnapshot(), loadWizardState(), normalizeWizardState(), postJson(), saveWizardState(), validateProviderKey(), verifyTelegram() (+1 more)
 
-### Community 25 - "Community 25"
-Cohesion: 0.33
-Nodes (1): TranscriptManager
-
 ### Community 26 - "Community 26"
-Cohesion: 0.26
-Nodes (8): deepMerge(), defaultConfigPath(), envLayer(), getConfig(), isObject(), loadConfig(), readJsonIfPresent(), setPath()
-
-### Community 27 - "Community 27"
 Cohesion: 0.19
 Nodes (1): RateLimitBroker
 
-### Community 28 - "Community 28"
+### Community 27 - "Community 27"
 Cohesion: 0.2
 Nodes (1): SetupPage
+
+### Community 28 - "Community 28"
+Cohesion: 0.25
+Nodes (5): LinkedInAnalyticsPoller, build(), fakeClient(), passthroughDispatcher(), utcDay()
 
 ### Community 29 - "Community 29"
 Cohesion: 0.22
@@ -223,8 +237,8 @@ Cohesion: 0.32
 Nodes (1): FacebookPages
 
 ### Community 35 - "Community 35"
-Cohesion: 0.39
-Nodes (2): Metrics, zero()
+Cohesion: 0.52
+Nodes (6): analyticsFixtures(), heatmap(), matrix(), series(), summary(), topPosts()
 
 ### Community 36 - "Community 36"
 Cohesion: 0.29
@@ -234,44 +248,102 @@ Nodes (1): DashboardPage
 Cohesion: 0.43
 Nodes (1): InstagramPublisher
 
-### Community 38 - "Community 38"
+### Community 39 - "Community 39"
 Cohesion: 0.4
 Nodes (3): generateUuid(), getClientId(), createSocket()
 
-### Community 39 - "Community 39"
+### Community 40 - "Community 40"
 Cohesion: 0.33
 Nodes (1): ComposePage
 
-### Community 40 - "Community 40"
+### Community 41 - "Community 41"
 Cohesion: 0.33
 Nodes (1): InboxPage
 
-### Community 41 - "Community 41"
+### Community 42 - "Community 42"
 Cohesion: 0.4
 Nodes (1): InstagramInboxPoller
 
 ### Community 43 - "Community 43"
-Cohesion: 0.8
-Nodes (4): baseContact(), buildState(), detailContact(), mergeSuggestion()
+Cohesion: 0.6
+Nodes (1): TwitterQuotaGuard
+
+### Community 44 - "Community 44"
+Cohesion: 0.53
+Nodes (2): TwitterCreditTracker, utcMonth()
+
+### Community 45 - "Community 45"
+Cohesion: 0.4
+Nodes (2): TwitterAnalyticsPoller, utcDay()
 
 ### Community 46 - "Community 46"
+Cohesion: 0.47
+Nodes (1): TwitterPublisher
+
+### Community 47 - "Community 47"
+Cohesion: 0.4
+Nodes (1): OutboxDispatch
+
+### Community 50 - "Community 50"
 Cohesion: 0.6
 Nodes (3): normalise(), toList(), validateRulebook()
 
-### Community 48 - "Community 48"
+### Community 51 - "Community 51"
+Cohesion: 0.5
+Nodes (1): ThreadsPublisher
+
+### Community 52 - "Community 52"
+Cohesion: 0.4
+Nodes (1): PinterestPublisher
+
+### Community 53 - "Community 53"
+Cohesion: 0.4
+Nodes (1): OutboxScheduler
+
+### Community 54 - "Community 54"
 Cohesion: 0.83
 Nodes (3): charactersRemaining(), postLimitsFor(), validatePost()
 
+### Community 59 - "Community 59"
+Cohesion: 0.67
+Nodes (2): fetchImpl(), jsonResponse()
+
+### Community 60 - "Community 60"
+Cohesion: 0.5
+Nodes (1): InstagramDmSender
+
+### Community 61 - "Community 61"
+Cohesion: 0.5
+Nodes (1): ThreadsInsightsPoller
+
+### Community 62 - "Community 62"
+Cohesion: 0.5
+Nodes (1): ThreadsReplyPoller
+
+### Community 63 - "Community 63"
+Cohesion: 0.5
+Nodes (1): TwitterDmSender
+
+### Community 64 - "Community 64"
+Cohesion: 0.5
+Nodes (1): TwitterDmPoller
+
+### Community 65 - "Community 65"
+Cohesion: 0.5
+Nodes (1): LinkedInCommentPoller
+
 ## Knowledge Gaps
+- **Thin community `Community 21`** (14 nodes): `AnalyticsPage`, `.constructor()`, `.goto()`, `.metricValue()`, `.platformButton()`, `.stubDashboard()`, `.topPostHeading()`, `.topPostItem()`, `.windowButton()`, `key()`, `parsePlatform()`, `parseWindow()`, `readRecord()`, `analytics.page.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 22`** (14 nodes): `ApprovalQueue`, `.clear()`, `.constructor()`, `.decide()`, `.get()`, `.has()`, `.list()`, `.request()`, `.settle()`, `.size()`, `ApprovalQueueFullError`, `.constructor()`, `approval-queue.test.ts`, `approval-queue.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 23`** (14 nodes): `HandoffManager`, `.abortAll()`, `.assertThreadId()`, `.constructor()`, `.emitChange()`, `.isHumanOwned()`, `.list()`, `.owner()`, `.register()`, `.registeredCount()`, `.release()`, `.takeOver()`, `handoff-manager.test.ts`, `handoff-manager.ts`
+- **Thin community `Community 23`** (14 nodes): `TranscriptManager`, `.append()`, `.assertId()`, `.constructor()`, `.create()`, `.delete()`, `.enqueue()`, `.ledgerPath()`, `.list()`, `.load()`, `.metaPath()`, `.readMeta()`, `.renameId()`, `.renameTitle()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 25`** (13 nodes): `TranscriptManager`, `.append()`, `.assertId()`, `.create()`, `.delete()`, `.enqueue()`, `.ledgerPath()`, `.list()`, `.load()`, `.metaPath()`, `.readMeta()`, `.renameId()`, `.renameTitle()`
+- **Thin community `Community 24`** (14 nodes): `HandoffManager`, `.abortAll()`, `.assertThreadId()`, `.constructor()`, `.emitChange()`, `.isHumanOwned()`, `.list()`, `.owner()`, `.register()`, `.registeredCount()`, `.release()`, `.takeOver()`, `handoff-manager.test.ts`, `handoff-manager.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 27`** (13 nodes): `defaultSleep()`, `RateLimitBroker`, `.acquire()`, `.configure()`, `.constructor()`, `.has()`, `.maybeWarn()`, `.remainingQuota()`, `.resetQuota()`, `.tryAcquire()`, `fakeClock()`, `broker.test.ts`, `broker.ts`
+- **Thin community `Community 26`** (13 nodes): `defaultSleep()`, `RateLimitBroker`, `.acquire()`, `.configure()`, `.constructor()`, `.has()`, `.maybeWarn()`, `.remainingQuota()`, `.resetQuota()`, `.tryAcquire()`, `fakeClock()`, `broker.test.ts`, `broker.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 28`** (12 nodes): `SetupPage`, `.advanceFromWelcome()`, `.completeProviderStep()`, `.constructor()`, `.goto()`, `.providerRadio()`, `.selectProvider()`, `.stepTitle()`, `.stubStatus()`, `.stubTelegramVerify()`, `.stubValidateKey()`, `setup.page.ts`
+- **Thin community `Community 27`** (12 nodes): `SetupPage`, `.advanceFromWelcome()`, `.completeProviderStep()`, `.constructor()`, `.goto()`, `.providerRadio()`, `.selectProvider()`, `.stepTitle()`, `.stubStatus()`, `.stubTelegramVerify()`, `.stubValidateKey()`, `setup.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 29`** (9 nodes): `OutboxPage`, `.constructor()`, `.dlqHeading()`, `.failedHeading()`, `.goto()`, `.retryButton()`, `.stub()`, `.stubRetry()`, `outbox.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -281,33 +353,61 @@ Nodes (3): charactersRemaining(), postLimitsFor(), validatePost()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 34`** (8 nodes): `FacebookPages`, `.constructor()`, `.createPost()`, `.getInsights()`, `.listComments()`, `.listPages()`, `.reply()`, `.run()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 35`** (8 nodes): `Metrics`, `.increment()`, `.recordFailed()`, `.recordReceived()`, `.recordSent()`, `.reset()`, `.snapshot()`, `zero()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 36`** (7 nodes): `DashboardPage`, `.constructor()`, `.dialog()`, `.goto()`, `.kpiCard()`, `.openQuickActions()`, `dashboard.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 37`** (7 nodes): `InstagramPublisher`, `.constructor()`, `.createCarousel()`, `.createSingle()`, `.publish()`, `.run()`, `.waitForContainer()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 39`** (6 nodes): `ComposePage`, `.constructor()`, `.goto()`, `.stubConnections()`, `.target()`, `compose.page.ts`
+- **Thin community `Community 40`** (6 nodes): `ComposePage`, `.constructor()`, `.goto()`, `.stubConnections()`, `.target()`, `compose.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 40`** (6 nodes): `InboxPage`, `.constructor()`, `.conversationList()`, `.goto()`, `.listOrEmptyState()`, `inbox.page.ts`
+- **Thin community `Community 41`** (6 nodes): `InboxPage`, `.constructor()`, `.conversationList()`, `.goto()`, `.listOrEmptyState()`, `inbox.page.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 41`** (6 nodes): `InstagramInboxPoller`, `.constructor()`, `.persistMessage()`, `.poll()`, `.pollComments()`, `.run()`
+- **Thin community `Community 42`** (6 nodes): `InstagramInboxPoller`, `.constructor()`, `.persistMessage()`, `.poll()`, `.pollComments()`, `.run()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 43`** (6 nodes): `TwitterQuotaGuard`, `.constructor()`, `.ensureWithinQuota()`, `.fire()`, `.recordWrite()`, `.status()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 44`** (6 nodes): `TwitterCreditTracker`, `.constructor()`, `.record()`, `.summary()`, `.usedThisMonth()`, `utcMonth()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 45`** (6 nodes): `TwitterAnalyticsPoller`, `.constructor()`, `.pollFollowers()`, `.pollTweetMetrics()`, `.run()`, `utcDay()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 46`** (6 nodes): `TwitterPublisher`, `.constructor()`, `.createTweet()`, `.publish()`, `.reply()`, `.run()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 47`** (6 nodes): `OutboxDispatch`, `.get()`, `.has()`, `.platforms()`, `.publish()`, `.register()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 51`** (5 nodes): `ThreadsPublisher`, `.constructor()`, `.publish()`, `.run()`, `.waitForContainer()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 52`** (5 nodes): `PinterestPublisher`, `.constructor()`, `.createBoard()`, `.createPin()`, `.run()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 53`** (5 nodes): `OutboxScheduler`, `.constructor()`, `.runTick()`, `.start()`, `.stop()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 59`** (4 nodes): `fetchImpl()`, `jsonResponse()`, `make()`, `graph-client.test.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 60`** (4 nodes): `InstagramDmSender`, `.constructor()`, `.sendDm()`, `.supports()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 61`** (4 nodes): `ThreadsInsightsPoller`, `.constructor()`, `.poll()`, `.run()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 62`** (4 nodes): `ThreadsReplyPoller`, `.constructor()`, `.poll()`, `.run()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 63`** (4 nodes): `TwitterDmSender`, `.constructor()`, `.sendDm()`, `.supports()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 64`** (4 nodes): `TwitterDmPoller`, `.constructor()`, `.poll()`, `.run()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 65`** (4 nodes): `LinkedInCommentPoller`, `.constructor()`, `.poll()`, `.run()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `fetchImpl()` connect `Community 1` to `Community 3`, `Community 7`?**
+- **Why does `fetchImpl()` connect `Community 5` to `Community 2`, `Community 7`?**
   _High betweenness centrality (0.051) - this node is a cross-community bridge._
-- **Why does `probeOllama()` connect `Community 7` to `Community 1`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
-- **Are the 21 inferred relationships involving `startServer()` (e.g. with `bootstrap()` and `getConfig()`) actually correct?**
-  _`startServer()` has 21 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 22 inferred relationships involving `startServer()` (e.g. with `bootstrap()` and `getConfig()`) actually correct?**
+  _`startServer()` has 22 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 12 inferred relationships involving `assertSafeUrl()` (e.g. with `.constructor()` and `.constructor()`) actually correct?**
   _`assertSafeUrl()` has 12 INFERRED edges - model-reasoned connections that need verification._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.02 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
+  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
+- **Should `Community 3` be split into smaller, more focused modules?**
   _Cohesion score 0.04 - nodes in this community are weakly interconnected._
