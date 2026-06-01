@@ -44,6 +44,8 @@ import { createTwitterRouter } from "./twitter/router.js";
 import { createInboxRouter } from "./inbox/router.js";
 import { createOutboxRouter } from "./outbox/router.js";
 import { createAutoReplyRouter } from "./auto-reply/router.js";
+import { createContactsRouter } from "./crm/router.js";
+import { CrmRepository } from "../crm/index.js";
 import { BrandVoiceRepository } from "../personality/rulebook-repository.js";
 import { AutoReplyAuditRepository } from "../routing/audit-repository.js";
 import { AutoReplyPipeline } from "../routing/pipeline.js";
@@ -425,6 +427,15 @@ export async function startServer(): Promise<StartedServer> {
     enabled: () => config.autoReply.enabled
   });
 
+  // Light CRM (epic #90): contacts list/detail, lead scoring, and merges. The
+  // repository reads the live lead-score weights so a config reload is honoured;
+  // merge events ride the same deferred `quotaSink` emit as the inbox/outbox.
+  const crmRepository = new CrmRepository(db, () => config.crm.leadScore);
+  const contactsRouter = createContactsRouter({
+    repo: crmRepository,
+    emit: (event, payload) => quotaSink.emit?.(event, payload)
+  });
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
@@ -434,7 +445,8 @@ export async function startServer(): Promise<StartedServer> {
     twitterRouter,
     inboxRouter,
     outboxRouter,
-    autoReplyRouter
+    autoReplyRouter,
+    contactsRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {

@@ -112,6 +112,9 @@ Layout under the data directory:
 | `personality/profiler.ts` + `personality/rulebook-repository.ts` | **Linguistic Profiler** — `scoreVoice()` token-overlap voice scorer (tone weighted 2:1 over exemplars, banned-word **veto** clamps to 0) + the single-row brand-voice rulebook store (epic #78, #79/#80) |
 | `routing/decision.ts` + `routing/pipeline.ts` + `routing/audit-repository.ts` | Confidence/voice **threshold gate** (inclusive `>=`), the evaluate→auto-send/queue→resolve pipeline, and the append-only `auto_reply_audit` store (epic #78, #81/#82) |
 | `server/auto-reply/router.ts` | `/api/auto-reply/*` — config, rulebook GET/PUT, draft `score`, `evaluate`, audit `resolve`, and the queryable audit log (epic #78, #83) |
+| `crm/lead-score.ts` + `crm/email.ts` | **Light CRM** primitives — deterministic `scoreLead()` (engagement/sentiment/follower, no ML) + pure email/follower discovery helpers (epic #90, #92) |
+| `crm/repository.ts` | `CrmRepository` — cross-platform identity sync over SocialBrain, scored list/detail, unified timeline, suggested + transactional manual merge (epic #90, #91/#93/#94) |
+| `server/crm/router.ts` | `/api/contacts/*` — scored list, detail+timeline, suggested-merges, merge history, and `POST /merge` (emits `crm:merge`) (epic #90) |
 
 ## 5. UI map (`ui/`)
 
@@ -133,6 +136,8 @@ It runs on port `3001` in development and talks to the Node server (port
 | `lib/connections.ts` | `fetchConnections()` client for `GET /api/connections` (#53) |
 | `app/settings/page.tsx` + `components/auto-reply/` | Brand-voice rulebook editor (tone/banned-words/exemplars), hybrid-posture summary, and the decision log where queued drafts are reviewed/approved/edited/rejected with both scores surfaced (epic #78, #83) |
 | `lib/auto-reply.ts` | Auto-reply client: config/rulebook/score/audit fetchers + React Query hooks subscribed to `autoReply:*` socket events (epic #78) |
+| `app/contacts/page.tsx` + `components/crm/` | Light CRM: scored contact list (lead-bucket badge), contact detail with unified conversation timeline + linked accounts, and a suggested-merge queue with one-click merge (epic #90, #93/#94) |
+| `lib/crm.ts` | CRM client: contact/detail/suggested-merge fetchers + React Query hooks subscribed to the `crm:merge` socket event (epic #90) |
 | `components/top-nav.tsx` | Primary top navigation (active-route `aria-current`) + theme toggle |
 | `components/theme-provider.tsx` | Theme context backed by `useSyncExternalStore`; `localStorage` persistence + system-scheme tracking |
 | `components/theme-toggle.tsx` | System/light/dark dropdown toggle |
@@ -192,6 +197,15 @@ of the #127 SocialBrain store:
 |---|---|
 | `brand_voice_rulebook` | Single-row (`CHECK (id = 1)`) workspace voice config — `tone`, `banned_words_json`, `exemplars_json` — read by the profiler and edited from `/settings` |
 | `auto_reply_audit` | **Append-only** decision ledger — `thread_id`, `contact_id`, `platform`, `prompt`, `draft_text`, `final_text`, `confidence`, `voice_match`, `tone_match`, `banned_hits_json`, `decision` (`auto_send`/`queue`), `model`, `human_override`, `outcome` (`pending`/`sent`/`rejected`), timestamps. Indexed by `thread_id`, `created_at`, and `contact_id` (GDPR right-to-delete cascade, #138) |
+
+`0009-crm.sql` (epic #90) adds the Light CRM identity layer over the #127
+SocialBrain store:
+
+| Table | Purpose |
+|---|---|
+| `crm_contacts` | Cross-platform CRM identity — `display_name`, normalized lowercase `email`, `follower_count`, timestamps; indexed by `email` |
+| `crm_contact_links` | One identity ↔ many `social_contacts` join, `UNIQUE (social_contact_id)` (a social contact maps to exactly one identity), **ON DELETE CASCADE** |
+| `crm_contact_merges` | **Append-only** merge audit — `survivor_id`, `source_id`, `mode` (`manual`/`suggested`), `created_at`; indexed by `survivor_id` |
 
 ## 7. Copilot SDK runtime + smart router + privacy mode
 
@@ -711,7 +725,66 @@ missing `approve` boolean, 409 on an already-resolved row), and `GET /audit`
 hybrid-posture summary, and a decision log that surfaces **both** the confidence
 and voice scores on every row and lets a reviewer edit/approve/reject a queued
 draft.
+## 12.8 Light CRM — contacts, lead scoring, history, merging (#90)
 
+The Light CRM (`src/crm/`, `src/server/crm/`) layers a **cross-platform
+identity** over the SocialBrain store (`social_contacts` / `social_threads` /
+`social_messages`) without duplicating any platform data. It owns three new
+tables (migration `0009-crm.sql`):
+
+- `crm_contacts` — the CRM identity: `display_name`, normalized lowercase
+  `email`, `follower_count`, timestamps.
+- `crm_contact_links` — a one-identity-to-many join onto `social_contacts`.
+  `UNIQUE(social_contact_id)` guarantees a social contact belongs to exactly one
+  identity; `ON DELETE CASCADE` keeps links consistent when a contact is removed.
+- `crm_contact_merges` — an append-only audit row per merge
+  (`survivor_id`, `source_id`, `mode`).
+
+**Sync.** `CrmRepository.sync()` is idempotent: it finds every `social_contacts`
+row with no link and creates exactly one identity for it inside a transaction,
+discovering the email and follower count from the contact's metadata and recent
+message bodies (`src/crm/email.ts` — pure string/regex helpers, no network).
+`listContacts()` / `suggestedMerges()` call `sync()` first so newly-ingested
+contacts surface without a separate job.
+
+**Lead scoring (#92).** `scoreLead()` (`src/crm/lead-score.ts`) is a
+deterministic, dependency-free, network-free scorer — mirroring the
+`scoreVoice()` philosophy in §12.7 — blending three signals into `[0, 1]`:
+
+- **Engagement** = `clamp01(count / engagementTarget)` over a sliding window
+  (default 7 days). The window is enforced in SQL with
+  `julianday(COALESCE(sent_at, created_at)) >= julianday('now', '-N days')`.
+- **Sentiment** = a lexicon heuristic over recent bodies: neutral `0.5`, nudged
+  by the net positive/negative word ratio. No ML, no clock dependence.
+- **Follower** = `clamp01(log1p(followers) / log1p(followerTarget))` so a large
+  audience contributes with diminishing returns.
+
+With the default weights (`0.7` / `0.1` / `0.2`) a contact with **exactly 30
+engagements in the last 7 days** (neutral sentiment, no followers) scores
+`0.7·1 + 0.1·0.5 + 0.2·0 = 0.75`, the inclusive `topThreshold`, landing it in
+the `top` bucket — the epic acceptance criterion, unit-tested at the 29/30
+boundary. All weights/thresholds are config-driven (`config.crm.leadScore`).
+
+**Conversation history (#93).** `timeline()` joins `social_messages` through the
+re-pointed links of **all** linked accounts, ordered by
+`COALESCE(sent_at, created_at)`, so a merged contact's DMs and comments read as
+one chronological thread spanning every platform.
+
+**Merging (#94).** `suggestedMerges()` groups identities by normalized email and
+emits every unordered pair sharing one (e.g. an Instagram bio link and a
+LinkedIn profile). `merge(survivorId, sourceId)` runs in a **single
+transaction**: re-point the source's links to the survivor, backfill the
+survivor's email/follower/display fields, record a `crm_contact_merges` audit
+row, then delete the source identity. History is preserved automatically because
+it is joined through links, not copied.
+
+**HTTP.** `createContactsRouter` mounts under `/api/contacts` behind a
+60-req/min/IP limiter: `GET /` (scored list), `GET /:id` (detail + timeline,
+422 on a non-numeric id, 404 when missing), `GET /suggested-merges`,
+`GET /merges` (audit history), and `POST /merge` (422 on a malformed body, 409
+on a self/missing merge). A successful merge emits `crm:merge` over Socket.IO so
+the `/contacts` UI refetches live. List limits are normalized at the repository
+boundary so a forged `LIMIT -1` can never return an unbounded set.
 ## 13. Security model
 
 ### Credential vault (`src/vault/`)
