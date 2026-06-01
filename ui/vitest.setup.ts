@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import * as React from "react";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 
@@ -46,3 +47,24 @@ if (!globalThis.ResizeObserver) {
     disconnect() {}
   };
 }
+
+// recharts relies on a measured container (ResponsiveContainer + ResizeObserver)
+// that never reports non-zero dimensions under jsdom, so its charts render
+// empty and warn. Replace the primitives we use with thin pass-through wrappers
+// so chart components mount deterministically and we can assert on their
+// surrounding markup (titles, legends, empty states).
+vi.mock("recharts", () => {
+  const Pass = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement("div", { "data-recharts": "true" }, children);
+  const Empty = () => null;
+  return {
+    ResponsiveContainer: Pass,
+    LineChart: Pass,
+    Line: Empty,
+    XAxis: Empty,
+    YAxis: Empty,
+    CartesianGrid: Empty,
+    Tooltip: Empty,
+    Legend: Empty
+  };
+});

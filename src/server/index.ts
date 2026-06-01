@@ -44,6 +44,10 @@ import { createTwitterRouter } from "./twitter/router.js";
 import { createInboxRouter } from "./inbox/router.js";
 import { createOutboxRouter } from "./outbox/router.js";
 import { createAutoReplyRouter } from "./auto-reply/router.js";
+import { createAnalyticsRouter } from "./analytics/router.js";
+import { AnalyticsCacheRepository } from "../analytics/repository.js";
+import { AnalyticsAggregatorScheduler, WeeklyDigestScheduler } from "../analytics/scheduler.js";
+import { createMailer } from "../analytics/mailer.js";
 import { createContactsRouter } from "./crm/router.js";
 import { CrmRepository } from "../crm/index.js";
 import { BrandVoiceRepository } from "../personality/rulebook-repository.js";
@@ -427,6 +431,12 @@ export async function startServer(): Promise<StartedServer> {
     enabled: () => config.autoReply.enabled
   });
 
+  // Analytics dashboard (epic #95). The cache repository serves the read API
+  // from the rolled-up tables (0010); the aggregator + digest schedulers are
+  // constructed below and started after listen (when enabled).
+  const analyticsRepo = new AnalyticsCacheRepository(db);
+  const analyticsRouter = createAnalyticsRouter({ repo: analyticsRepo });
+
   // Light CRM (epic #90): contacts list/detail, lead scoring, and merges. The
   // repository reads the live lead-score weights so a config reload is honoured;
   // merge events ride the same deferred `quotaSink` emit as the inbox/outbox.
@@ -446,6 +456,7 @@ export async function startServer(): Promise<StartedServer> {
     inboxRouter,
     outboxRouter,
     autoReplyRouter,
+    analyticsRouter,
     contactsRouter
   });
   const httpServer = createServer(app);
@@ -499,11 +510,50 @@ export async function startServer(): Promise<StartedServer> {
     quotaSink.alert = (text) => void channel.notify(text);
   }
 
+  // Analytics schedulers (epic #95) — opt-in. The aggregator rolls raw insights
+  // into the cache tables daily; the weekly digest composes a Markdown summary
+  // and delivers it over Telegram (best-effort) and, when SMTP is configured,
+  // email. The SMTP password is read from the environment (never plaintext
+  // config) so it stays out of the on-disk config file.
+  const analyticsLogger = {
+    info: (msg: string, meta?: Record<string, unknown>) => logger.info(msg, meta),
+    error: (msg: string, meta?: Record<string, unknown>) => logger.error(msg, meta)
+  };
+  const analyticsMailer = createMailer({
+    settings: config.analytics.smtp,
+    password: process.env.OPENZIGS_SOCIAL_SMTP_PASSWORD
+  });
+  const analyticsAggregator = new AnalyticsAggregatorScheduler({
+    repo: analyticsRepo,
+    timezone: config.analytics.timezone,
+    cronExpression: config.analytics.aggregatorCron,
+    emit: (event, payload) => quotaSink.emit?.(event, payload),
+    logger: analyticsLogger
+  });
+  const digestNotify = telegram
+    ? (text: string): Promise<void> => (telegram as TelegramChannel).notify(text)
+    : undefined;
+  const weeklyDigest = new WeeklyDigestScheduler({
+    repo: analyticsRepo,
+    timezone: config.analytics.timezone,
+    topLimit: config.analytics.digestTopPosts,
+    cronExpression: config.analytics.digestCron,
+    notify: digestNotify,
+    mailer: analyticsMailer,
+    logger: analyticsLogger
+  });
+  if (config.analytics.enabled) {
+    analyticsAggregator.start();
+    weeklyDigest.start();
+  }
+
   let closed = false;
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
     outboxScheduler.stop();
+    analyticsAggregator.stop();
+    weeklyDigest.stop();
     if (telegram) await telegram.stop().catch(() => undefined);
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));

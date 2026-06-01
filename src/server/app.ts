@@ -78,6 +78,12 @@ export interface AppDeps {
    */
   autoReplyRouter?: Router;
   /**
+   * Pre-built analytics dashboard router (epic #95), mounted at
+   * `/api/analytics` when provided. Built in ./index.ts from the analytics
+   * cache repository so this factory stays decoupled from the rollup internals.
+   */
+  analyticsRouter?: Router;
+  /**
    * Pre-built Light CRM router (epic #90), mounted at `/api/contacts` when
    * provided. Built in ./index.ts from the CRM repository so this factory stays
    * decoupled from the SQLite internals.
@@ -192,6 +198,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.autoReplyRouter) {
     api.use("/auto-reply", deps.autoReplyRouter);
+  }
+  if (deps.analyticsRouter) {
+    api.use("/analytics", deps.analyticsRouter);
   }
   if (deps.contactsRouter) {
     api.use("/contacts", deps.contactsRouter);
