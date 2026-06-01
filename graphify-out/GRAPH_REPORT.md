@@ -1,7 +1,7 @@
 # Graph Report - openzigs-social  (2026-06-01)
 
 ## Corpus Check
-- 442 files · ~206,273 words
+- 442 files · ~206,279 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -75,8 +75,8 @@
   ui/components/inbox/thread-detail.tsx → src/inbox/platform-limits.ts
 - `detail()` --calls--> `limitsFor()`  [INFERRED]
   ui/components/inbox/thread-detail.test.tsx → src/inbox/platform-limits.ts
-- `defaultKeyMaterial()` --calls--> `platform()`  [INFERRED]
-  src/vault/vault.ts → ui/components/onboarding/social-connect-step.test.tsx
+- `platform()` --calls--> `defaultKeyMaterial()`  [INFERRED]
+  ui/components/onboarding/social-connect-step.test.tsx → src/vault/vault.ts
 - `handleVerify()` --calls--> `verifyTelegram()`  [INFERRED]
   ui/components/setup/telegram-step.tsx → src/server/setup/telegram-verify.ts
 - `preview()` --calls--> `postLimitsFor()`  [INFERRED]
