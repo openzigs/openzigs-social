@@ -379,6 +379,36 @@ Your SMTP **password is never stored in config** — set it in the environment a
 `OPENZIGS_SOCIAL_SMTP_PASSWORD`. Email is only attempted when the host, from, and
 to addresses are all present; otherwise the digest is Telegram-only.
 
+## 9.5 Onboarding & guided setup
+
+The **Onboarding** tab is a guided polish flow you can run on first launch and
+re-launch any time. Every step is optional — skip the ones you don't need — and
+your progress is remembered between visits.
+
+- **Local model.** openzigs-social detects whether **Ollama** is running and
+  recommends the **Gemma 4** variant that fits your machine's RAM. Pick the
+  recommended variant (or override it), then **Use this model**; if it isn't
+  downloaded yet, **Pull** fetches it. Prefer a hosted model? Add an OpenAI,
+  Anthropic, or OpenAI-compatible key and the matching provider chip lights up.
+- **Connect platforms.** Each platform shows whether its app credentials are
+  configured and whether you're connected. **Connect** opens the platform's
+  authorization page in a new tab.
+- **Meta app.** A numbered, screenshot-backed walkthrough for creating your own
+  Meta app so Instagram, Facebook, and Threads use **your** rate limits. Paste
+  your **App ID** and **App Secret** — the secret is stored securely and never
+  shown again — and the wizard hands back the exact **scopes** (one click to
+  copy) and **redirect URIs** to register in the Meta developer console.
+- **Starter recipe.** Pick a **creator**, **small-biz**, or **agency** preset to
+  seed a sensible brand voice (tone, words to avoid, example posts) plus a
+  suggested set of platforms and a posting cadence.
+- **Brand voice.** Paste or upload examples of your writing (JSON or CSV); replies
+  learn your tone from these.
+
+**Contextual tour.** The first time you open the **Inbox**, **Calendar**, and
+**Settings** (brand voice) screens, a short coach-mark explains what each does.
+Dismiss it with **Got it**; it stays hidden until you press **Re-launch tour**
+from the Onboarding tab.
+
 ## 10. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your

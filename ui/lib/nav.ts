@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Inbox,
   PenSquare,
+  Rocket,
   Send,
   Settings,
   Users,
@@ -23,6 +24,7 @@ export const NAV_ROUTES: readonly NavRoute[] = [
   { href: "/outbox", label: "Outbox", icon: Send },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/contacts", label: "Contacts", icon: Users },
+  { href: "/onboarding", label: "Onboarding", icon: Rocket },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
