@@ -3,7 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingPanel } from "./onboarding-panel";
-import { completeStep, getProgressSnapshot, relaunchOnboarding, skipStep } from "@/lib/onboarding";
+import { TourOverlay } from "./tour-overlay";
+import {
+  completeStep,
+  dismissTourSection,
+  getProgressSnapshot,
+  isTourSectionDismissed,
+  relaunchOnboarding,
+  skipStep
+} from "@/lib/onboarding";
 
 vi.mock("./model-panel", () => ({
   ModelPanel: ({ onComplete }: { onComplete?: () => void }) => (
@@ -54,12 +62,34 @@ describe("OnboardingPanel", () => {
     expect(screen.getByText("social-step")).toBeInTheDocument();
   });
 
-  it("re-launches onboarding, clearing progress", () => {
+  it("restarts setup, clearing wizard progress", () => {
     completeStep("model");
     skipStep("social");
     render(<OnboardingPanel />);
-    fireEvent.click(screen.getByRole("button", { name: /re-launch tour/i }));
+    fireEvent.click(screen.getByRole("button", { name: /restart setup/i }));
     expect(getProgressSnapshot()).toEqual({ completed: [], skipped: [] });
+  });
+
+  it("re-launches the tour, clearing coach-mark dismissals", () => {
+    dismissTourSection("inbox");
+    render(<OnboardingPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /re-launch tour/i }));
+    expect(isTourSectionDismissed("inbox")).toBe(false);
+  });
+
+  it("re-renders a dismissed tour overlay after re-launching the tour", () => {
+    dismissTourSection("inbox");
+    render(
+      <>
+        <OnboardingPanel />
+        <TourOverlay section="inbox" />
+      </>
+    );
+    expect(screen.queryByRole("dialog", { name: /inbox tour/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /re-launch tour/i }));
+
+    expect(screen.getByRole("dialog", { name: /inbox tour/i })).toBeInTheDocument();
   });
 
   it("announces completion once every step is done or skipped", () => {

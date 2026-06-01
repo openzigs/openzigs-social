@@ -11,6 +11,7 @@ import {
   getProgressSnapshot,
   isOnboardingComplete,
   relaunchOnboarding,
+  relaunchTour,
   skipStep,
   stepStatus,
   subscribeOnboarding,
@@ -36,8 +37,10 @@ const STATUS_LABEL: Record<"done" | "skipped" | "todo", string> = {
 
 /**
  * Onboarding orchestrator (epic #100). A tabbed wizard that wires every polish
- * step together. Each step is skippable and the whole flow is re-launchable
- * from the admin panel; progress persists in `localStorage`.
+ * step together. Each step is skippable, and two admin-panel controls make the
+ * polish surfaces re-launchable: "Re-launch tour" clears the contextual
+ * coach-mark dismissals (`relaunchTour`) and "Restart setup" resets the wizard
+ * step progress (`relaunchOnboarding`). Progress persists in `localStorage`.
  */
 export function OnboardingPanel() {
   const progress = React.useSyncExternalStore(
@@ -77,9 +80,14 @@ export function OnboardingPanel() {
               : "Finish setup, or skip steps you don't need right now."}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => relaunchOnboarding()}>
-          Re-launch tour
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => relaunchTour()}>
+            Re-launch tour
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => relaunchOnboarding()}>
+            Restart setup
+          </Button>
+        </div>
       </header>
 
       <Tabs value={active} onValueChange={(v) => setActive(v as OnboardingStep)}>

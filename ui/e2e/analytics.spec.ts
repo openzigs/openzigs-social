@@ -46,7 +46,13 @@ function analyticsFixtures(): AnalyticsStubData {
           avgEngagementPerPost: 150
         },
         [
-          { platform: "instagram", engagement: 1000, posts: 5, impressions: 2000000, followers: 300 },
+          {
+            platform: "instagram",
+            engagement: 1000,
+            posts: 5,
+            impressions: 2000000,
+            followers: 300
+          },
           { platform: "linkedin", engagement: 200, posts: 3, impressions: 1400000, followers: 200 }
         ]
       ),
@@ -59,7 +65,15 @@ function analyticsFixtures(): AnalyticsStubData {
           followers: 300,
           avgEngagementPerPost: 200
         },
-        [{ platform: "instagram", engagement: 1000, posts: 5, impressions: 2000000, followers: 300 }]
+        [
+          {
+            platform: "instagram",
+            engagement: 1000,
+            posts: 5,
+            impressions: 2000000,
+            followers: 300
+          }
+        ]
       ),
       "30:linkedin": summary(
         30,
@@ -146,25 +160,61 @@ function analyticsFixtures(): AnalyticsStubData {
     },
     topPosts: {
       "30:all": topPosts([
-        { platform: "instagram", externalId: "ig-1", engagement: 1250, publishedAt: 1748476800000, rank: 1 },
+        {
+          platform: "instagram",
+          externalId: "ig-1",
+          engagement: 1250,
+          publishedAt: 1748476800000,
+          rank: 1
+        },
         { platform: "instagram", externalId: "ig-2", engagement: 900, publishedAt: null, rank: 2 },
-        { platform: "linkedin", externalId: "li-1", engagement: 300, publishedAt: 1748476800000, rank: 1 },
+        {
+          platform: "linkedin",
+          externalId: "li-1",
+          engagement: 300,
+          publishedAt: 1748476800000,
+          rank: 1
+        },
         { platform: "linkedin", externalId: "li-2", engagement: 140, publishedAt: null, rank: 2 }
       ]),
       "30:instagram": topPosts([
-        { platform: "instagram", externalId: "ig-1", engagement: 1250, publishedAt: 1748476800000, rank: 1 },
+        {
+          platform: "instagram",
+          externalId: "ig-1",
+          engagement: 1250,
+          publishedAt: 1748476800000,
+          rank: 1
+        },
         { platform: "instagram", externalId: "ig-2", engagement: 900, publishedAt: null, rank: 2 }
       ]),
       "30:linkedin": topPosts([
-        { platform: "linkedin", externalId: "li-1", engagement: 300, publishedAt: 1748476800000, rank: 1 },
+        {
+          platform: "linkedin",
+          externalId: "li-1",
+          engagement: 300,
+          publishedAt: 1748476800000,
+          rank: 1
+        },
         { platform: "linkedin", externalId: "li-2", engagement: 140, publishedAt: null, rank: 2 }
       ]),
       "7:all": topPosts([
-        { platform: "instagram", externalId: "ig-7", engagement: 42, publishedAt: 1748736000000, rank: 1 },
+        {
+          platform: "instagram",
+          externalId: "ig-7",
+          engagement: 42,
+          publishedAt: 1748736000000,
+          rank: 1
+        },
         { platform: "linkedin", externalId: "li-7", engagement: 11, publishedAt: null, rank: 1 }
       ]),
       "7:instagram": topPosts([
-        { platform: "instagram", externalId: "ig-7", engagement: 42, publishedAt: 1748736000000, rank: 1 }
+        {
+          platform: "instagram",
+          externalId: "ig-7",
+          engagement: 42,
+          publishedAt: 1748736000000,
+          rank: 1
+        }
       ]),
       "7:linkedin": topPosts([
         { platform: "linkedin", externalId: "li-7", engagement: 11, publishedAt: null, rank: 1 }

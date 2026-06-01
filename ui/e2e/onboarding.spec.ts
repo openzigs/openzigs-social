@@ -442,14 +442,14 @@ test.describe("Skip and re-launch (#100)", () => {
     await expect(onboarding.statusBadge("recipe")).toHaveText("skipped");
   });
 
-  // AC (#100): the whole flow is re-launchable from the admin panel, resetting
-  // progress back to "to do".
+  // AC (#100): the wizard progress is re-launchable from the admin panel via the
+  // "Restart setup" control, resetting every step back to "to do".
   test("re-launches the flow and resets progress", async () => {
     await onboarding.openStep("recipe");
     await onboarding.skipButton().click();
     await expect(onboarding.statusBadge("recipe")).toHaveText("skipped");
 
-    await onboarding.relaunchButton.click();
+    await onboarding.restartButton.click();
 
     await expect(onboarding.statusBadge("recipe")).toHaveText("to do");
     await expect(onboarding.statusBadge("model")).toHaveText("to do");

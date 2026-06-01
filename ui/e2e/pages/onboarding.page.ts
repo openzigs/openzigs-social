@@ -37,12 +37,14 @@ export class OnboardingPage {
   readonly page: Page;
   readonly heading: Locator;
   readonly relaunchButton: Locator;
+  readonly restartButton: Locator;
   readonly tablist: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.heading = page.getByRole("heading", { name: "Onboarding", level: 1 });
     this.relaunchButton = page.getByRole("button", { name: "Re-launch tour" });
+    this.restartButton = page.getByRole("button", { name: "Restart setup" });
     this.tablist = page.getByRole("tablist");
   }
 

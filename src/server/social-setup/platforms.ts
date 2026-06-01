@@ -69,6 +69,9 @@ export const PLATFORM_SETUP: Record<SocialPlatform, PlatformSetupMeta> = {
     scopes: ["threads_basic", "threads_content_publish"],
     credential: "meta",
     clientParam: "client_id",
+    // Threads' authorize endpoint expects comma-delimited scopes, unlike the
+    // Facebook/Instagram dialog (space-delimited) that shares the `meta`
+    // credential — per the Threads API docs. Do not "normalize" to a space.
     scopeSeparator: ","
   },
   linkedin: {

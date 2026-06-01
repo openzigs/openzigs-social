@@ -66,28 +66,44 @@ export class AnalyticsPage {
       const url = new URL(route.request().url());
       const lookupKey = key(parseWindow(url), parsePlatform(url));
       const summary = readRecord(data.summaries, lookupKey, "summary");
-      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(summary) });
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(summary)
+      });
     });
 
     await this.page.route(/\/api\/analytics\/engagement(?:\?.*)?$/, (route: Route) => {
       const url = new URL(route.request().url());
       const lookupKey = key(parseWindow(url), parsePlatform(url));
       const response = readRecord(data.engagement, lookupKey, "engagement");
-      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(response) });
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(response)
+      });
     });
 
     await this.page.route(/\/api\/analytics\/heatmap(?:\?.*)?$/, (route: Route) => {
       const url = new URL(route.request().url());
       const lookupKey = parsePlatform(url) ?? "all";
       const response = readRecord(data.heatmaps, lookupKey, "heatmap");
-      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(response) });
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(response)
+      });
     });
 
     await this.page.route(/\/api\/analytics\/top-posts(?:\?.*)?$/, (route: Route) => {
       const url = new URL(route.request().url());
       const lookupKey = key(parseWindow(url), parsePlatform(url));
       const response = readRecord(data.topPosts, lookupKey, "top-posts");
-      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(response) });
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(response)
+      });
     });
   }
 

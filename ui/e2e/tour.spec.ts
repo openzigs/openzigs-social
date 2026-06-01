@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { TOUR_COPY, TOUR_LABELS, TOUR_SECTIONS } from "@/lib/onboarding";
 
+import { OnboardingPage } from "./pages/onboarding.page";
 import { TourPage } from "./pages/tour.page";
 
 /**
@@ -62,6 +63,26 @@ test.describe("Contextual tour overlays (#100)", () => {
     await expect(tour.coachMark("scheduler")).toBeHidden();
 
     await test.step("the inbox coach-mark is still shown", async () => {
+      await tour.goto("inbox");
+      await expect(tour.coachMark("inbox")).toBeVisible();
+    });
+  });
+
+  // AC (#100 AC3): a dismissed coach-mark is re-launchable from the admin panel.
+  // After dismissing the inbox coach-mark, clicking "Re-launch tour" on the
+  // `/onboarding` panel clears the dismissal and the overlay reappears.
+  test("re-launches dismissed coach-marks from the admin panel", async ({ page }) => {
+    await tour.goto("inbox");
+    await tour.dismiss("inbox");
+    await expect(tour.coachMark("inbox")).toBeHidden();
+
+    await test.step("re-launch the tour from the /onboarding admin panel", async () => {
+      const onboarding = new OnboardingPage(page);
+      await onboarding.goto();
+      await onboarding.relaunchButton.click();
+    });
+
+    await test.step("the inbox coach-mark is visible again", async () => {
       await tour.goto("inbox");
       await expect(tour.coachMark("inbox")).toBeVisible();
     });

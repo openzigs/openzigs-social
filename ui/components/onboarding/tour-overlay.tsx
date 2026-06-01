@@ -15,8 +15,9 @@ import {
 /**
  * Contextual tour overlay (epic #100 AC). Renders a dismissible coach-mark for a
  * single section (inbox / scheduler / brand-voice). Once dismissed it stays
- * hidden (persisted in `localStorage`) until the tour is re-launched from the
- * admin panel. SSR-safe via `useSyncExternalStore`.
+ * hidden (persisted in `localStorage`) until the tour is re-launched via the
+ * "Re-launch tour" control in the `/onboarding` admin panel (`relaunchTour`).
+ * SSR-safe via `useSyncExternalStore`.
  */
 export function TourOverlay({ section }: { section: TourSection }) {
   const state = React.useSyncExternalStore(subscribeOnboarding, getTourSnapshot, getTourSnapshot);
