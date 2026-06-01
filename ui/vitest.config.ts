@@ -24,7 +24,8 @@ export default defineConfig({
         "hooks/**",
         "app/page.tsx",
         "app/setup/**",
-        "app/inbox/**"
+        "app/inbox/**",
+        "app/analytics/**"
       ],
       exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts", "components/ui/**", "app/providers.tsx"],
       thresholds: {

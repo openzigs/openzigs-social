@@ -268,7 +268,64 @@ the final text, the scores, the decision, the model, and the timestamp. It
 survives restarts, is searchable by conversation and time range, and the
 underlying data is removed when you exercise your right-to-delete for a contact.
 
-## 9. Approvals over Telegram
+## 9. Analytics dashboard
+
+The **Analytics** tab turns the metrics your connected platforms report into a
+at-a-glance view of what's working. Everything is computed locally from data
+already on your machine — opening the tab never makes a live call to a platform,
+so it loads instantly.
+
+**Pick a window and a platform.** The pills at the top let you choose a trailing
+window — **7, 30, or 90 days** — and optionally narrow to a single platform.
+Switching the platform filter is instant: it re-slices data that's already
+loaded rather than refetching.
+
+**What you'll see:**
+
+- **KPI row** — total **engagement**, **posts** published (with the average
+  engagement per post), **impressions**, and current **followers** for the
+  selected window and platform.
+- **Engagement over time** — a line chart with one line per platform so you can
+  see trends and compare networks at a glance.
+- **Posting-time heatmap** — a 7-day × 24-hour grid where darker cells mean you
+  posted more in that day/hour slot. Use it to spot when you're most (and least)
+  active. Hover a cell for the exact count.
+- **Top posts** — your highest-engagement posts in the window, ranked and grouped
+  by platform.
+
+The dashboard updates **live**: whenever the nightly roll-up runs (or you
+trigger one), the panels refresh on their own — no reload needed.
+
+**Weekly digest.** If you enable analytics, openzigs-social can send you a
+**weekly digest** summarising engagement vs. the previous week and your top
+posts. The digest goes to **Telegram** (if the bot is connected) and, if you
+configure SMTP, **email** as well. The two channels are independent — if one
+fails, the other still goes out.
+
+To turn it on and (optionally) configure email delivery:
+
+```json
+{
+  "analytics": {
+    "enabled": true,
+    "smtp": {
+      "enabled": true,
+      "host": "smtp.example.com",
+      "port": 587,
+      "secure": false,
+      "user": "you@example.com",
+      "from": "you@example.com",
+      "to": "you@example.com"
+    }
+  }
+}
+```
+
+Your SMTP **password is never stored in config** — set it in the environment as
+`OPENZIGS_SOCIAL_SMTP_PASSWORD`. Email is only attempted when the host, from, and
+to addresses are all present; otherwise the digest is Telegram-only.
+
+## 10. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your
 remote control. The bot is **deny-by-default**: it only obeys your configured
@@ -296,7 +353,7 @@ lists everything still pending.
 a social platform is connected, the bot reports that DM delivery is unavailable
 rather than faking a send.
 
-## 10. Privacy mode
+## 11. Privacy mode
 
 Three modes:
 
@@ -313,7 +370,7 @@ Three modes:
 Switch modes from the UI privacy panel or programmatically via
 `wrapper.setPrivacyMode("session" | "global" | "off")`.
 
-## 11. Where are my credentials stored?
+## 12. Where are my credentials stored?
 
 In an encrypted vault at `~/.openzigs-social/auth.json` (file mode
 `0o600`, parent directory `0o700`). The vault uses AES-256-GCM envelope
@@ -321,7 +378,7 @@ encryption with a key derived from your machine identifier. All API keys,
 OAuth refresh tokens, and per-provider settings live there — nothing is
 ever written to disk in plaintext.
 
-## 12. Where is my data, and how do I configure it?
+## 13. Where is my data, and how do I configure it?
 
 Everything openzigs-social writes lives under a single data directory:
 
@@ -379,7 +436,7 @@ The server exposes a few operational endpoints (bound to
 The same `metrics` snapshot is pushed to connected UIs over Socket.IO as a
 `metrics:update` event whenever a counter changes.
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### "Ollama unreachable" warning on launch
 

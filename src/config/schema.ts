@@ -351,6 +351,60 @@ export const ConfigSchema = z
         voiceThreshold: z.coerce.number().min(0).max(1).default(0.8)
       })
       .strict()
+      .default({}),
+    analytics: z
+      .object({
+        /**
+         * Whether the analytics layer runs (epic #95): the daily aggregator
+         * cron that rolls `platform_insights_raw` up into the dashboard cache,
+         * and the weekly digest cron. Off by default — the dashboard still
+         * serves whatever cache exists, but nothing is computed or sent until
+         * this is enabled.
+         */
+        enabled: booleanish.default(false),
+        /**
+         * Cron cadence for the rollup aggregator. Default 03:10 daily (a quiet
+         * hour, offset off the top of the hour to avoid thundering-herd with
+         * other crons). Validated by node-cron at startup.
+         */
+        aggregatorCron: z.string().min(1).default("10 3 * * *"),
+        /**
+         * Cron cadence for the weekly digest. Default Sunday 18:00. Validated
+         * by node-cron at startup.
+         */
+        digestCron: z.string().min(1).default("0 18 * * 0"),
+        /**
+         * IANA timezone the posting-time heatmap and digest day boundaries are
+         * computed in. Defaults to UTC; set to your local zone (e.g.
+         * `"America/New_York"`) for a heatmap that matches your audience.
+         */
+        timezone: z.string().min(1).default("UTC"),
+        /** Number of top posts the weekly digest highlights. */
+        digestTopPosts: z.coerce.number().int().positive().max(20).default(3),
+        /**
+         * Optional SMTP delivery for the weekly digest. When `host`/`from`/`to`
+         * are unset the digest is sent over Telegram only — email delivery is
+         * skipped gracefully, never a crash. The SMTP password (if any) lives
+         * in the encrypted vault (BYOK), never here.
+         */
+        smtp: z
+          .object({
+            enabled: booleanish.default(false),
+            host: z.string().min(1).optional(),
+            port: z.coerce.number().int().min(1).max(65535).default(587),
+            /** Use implicit TLS (port 465). STARTTLS otherwise. */
+            secure: booleanish.default(false),
+            /** SMTP auth username (the password is read from the vault). */
+            user: z.string().min(1).optional(),
+            /** From address, e.g. `"OpenZigs <digest@example.com>"`. */
+            from: z.string().min(1).optional(),
+            /** Recipient address for the digest. */
+            to: z.string().min(1).optional()
+          })
+          .strict()
+          .default({})
+      })
+      .strict()
       .default({})
   })
   .strict();

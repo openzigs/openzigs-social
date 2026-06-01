@@ -112,6 +112,8 @@ Layout under the data directory:
 | `personality/profiler.ts` + `personality/rulebook-repository.ts` | **Linguistic Profiler** — `scoreVoice()` token-overlap voice scorer (tone weighted 2:1 over exemplars, banned-word **veto** clamps to 0) + the single-row brand-voice rulebook store (epic #78, #79/#80) |
 | `routing/decision.ts` + `routing/pipeline.ts` + `routing/audit-repository.ts` | Confidence/voice **threshold gate** (inclusive `>=`), the evaluate→auto-send/queue→resolve pipeline, and the append-only `auto_reply_audit` store (epic #78, #81/#82) |
 | `server/auto-reply/router.ts` | `/api/auto-reply/*` — config, rulebook GET/PUT, draft `score`, `evaluate`, audit `resolve`, and the queryable audit log (epic #78, #83) |
+| `analytics/` | Analytics roll-up engine + cache: `aggregator` (MAX-per-object windowed roll-ups), `heatmap` (timezone-aware 7×24 buckets), `top-posts`, `digest` (Markdown), `mailer` (nodemailer, SMTP password from env), `repository` (idempotent day-keyed cache, clamped `LIMIT`s), and `scheduler` (two `node-cron` wrappers, `analytics:updated` emit) (epic #95) |
+| `server/analytics/router.ts` | `/api/analytics/*` — `summary`, `engagement`, `heatmap`, `top-posts`; window/platform validated (422 on malformed), 60-req/min/IP limiter (epic #95) |
 
 ## 5. UI map (`ui/`)
 
@@ -133,6 +135,8 @@ It runs on port `3001` in development and talks to the Node server (port
 | `lib/connections.ts` | `fetchConnections()` client for `GET /api/connections` (#53) |
 | `app/settings/page.tsx` + `components/auto-reply/` | Brand-voice rulebook editor (tone/banned-words/exemplars), hybrid-posture summary, and the decision log where queued drafts are reviewed/approved/edited/rejected with both scores surfaced (epic #78, #83) |
 | `lib/auto-reply.ts` | Auto-reply client: config/rulebook/score/audit fetchers + React Query hooks subscribed to `autoReply:*` socket events (epic #78) |
+| `app/analytics/page.tsx` + `components/analytics/` | Analytics dashboard: window (7/30/90) + platform filter, KPI row, recharts engagement chart (pivoted client-side), posting-time heatmap, top-posts leaderboard; live on `analytics:updated` (epic #95) |
+| `lib/analytics.ts` | Analytics client: summary/engagement/heatmap/top-posts fetchers, `pivotEngagement`/`formatCompact`/`dayLabel` transforms, and React Query hooks subscribed to `analytics:updated` (epic #95) |
 | `components/top-nav.tsx` | Primary top navigation (active-route `aria-current`) + theme toggle |
 | `components/theme-provider.tsx` | Theme context backed by `useSyncExternalStore`; `localStorage` persistence + system-scheme tracking |
 | `components/theme-toggle.tsx` | System/light/dark dropdown toggle |
@@ -192,6 +196,17 @@ of the #127 SocialBrain store:
 |---|---|
 | `brand_voice_rulebook` | Single-row (`CHECK (id = 1)`) workspace voice config — `tone`, `banned_words_json`, `exemplars_json` — read by the profiler and edited from `/settings` |
 | `auto_reply_audit` | **Append-only** decision ledger — `thread_id`, `contact_id`, `platform`, `prompt`, `draft_text`, `final_text`, `confidence`, `voice_match`, `tone_match`, `banned_hits_json`, `decision` (`auto_send`/`queue`), `model`, `human_override`, `outcome` (`pending`/`sent`/`rejected`), timestamps. Indexed by `thread_id`, `created_at`, and `contact_id` (GDPR right-to-delete cascade, #138) |
+
+`0010-analytics.sql` (epic #95) adds the pre-computed analytics cache the
+dashboard reads from. Each table is keyed by `captured_for` (a `YYYY-MM-DD` day)
+and `UNIQUE` on its dimensions, so a nightly re-run **replaces** that day's rows
+rather than duplicating them:
+
+| Table | Purpose |
+|---|---|
+| `analytics_rollup` | Windowed metric roll-ups, `UNIQUE (platform, window_days, metric, captured_for)` — engagement/posts/impressions/followers per 7/30/90-day window |
+| `analytics_heatmap` | Posting-time buckets, `UNIQUE (platform, day_of_week, hour_of_day, captured_for)` |
+| `analytics_top_posts` | Per-window leaderboard, `UNIQUE (platform, window_days, external_id, captured_for)` |
 
 ## 7. Copilot SDK runtime + smart router + privacy mode
 
@@ -711,6 +726,66 @@ missing `approve` boolean, 409 on an already-resolved row), and `GET /audit`
 hybrid-posture summary, and a decision log that surfaces **both** the confidence
 and voice scores on every row and lets a reviewer edit/approve/reject a queued
 draft.
+
+## 12.8 Analytics dashboard + weekly digest (#95)
+
+The analytics layer turns the raw platform insight snapshots into a dashboard
+without ever blocking on a live platform call: a nightly cron rolls everything
+up into a pre-computed SQLite cache, and every read is served from that cache.
+
+**Module map.** `src/analytics/` is dependency-free domain logic plus the cache:
+
+- `types.ts` — the shared vocabulary (`RollupMetric`, `RollupWindow` 7/30/90,
+  the engagement/impression metric sets, `HeatmapBucket`, `TopPost`,
+  `EngagementDelta`).
+- `aggregator.ts` — `aggregatePostMetrics` / `rollupEngagement`. Both take the
+  **MAX** reading per object+metric inside a trailing window so a re-captured
+  snapshot of the same post never double-counts; account-level, out-of-window,
+  and unknown-metric rows are ignored, and every connected platform emits an
+  all-zero row when it had no activity (so the dashboard shows the platform, not
+  a gap).
+- `heatmap.ts` — `bucketPublishTimes` projects published posts into a
+  timezone-aware 7×24 day-of-week × hour-of-day grid (`assertValidTimeZone`
+  rejects a bogus IANA zone with a `RangeError`); `toHeatmapMatrix` densifies
+  the sparse buckets into a `number[][]`.
+- `top-posts.ts` — `topPosts` ranks per platform (default 3, clamped `[1,100]`);
+  `weekOverWeekDeltas` computes this-week-vs-last-week engagement with a null
+  `pctChange` when the prior week was zero.
+- `digest.ts` — `composeWeeklyDigest` renders a deterministic Markdown digest
+  (engagement vs last week + a **global** top-post ranking).
+- `mailer.ts` — `createMailer` builds a nodemailer transport **only** when SMTP
+  is fully configured (`enabled` + host + from + to), attaches auth only when a
+  user and a password are both present, and reads the password from
+  `OPENZIGS_SOCIAL_SMTP_PASSWORD` (never from `config`/disk).
+- `repository.ts` — `AnalyticsCacheRepository` reads `platform_insights_raw` +
+  published `outbox` rows, writes each daily snapshot in a single
+  delete-then-insert transaction (idempotent per `captured_for`), and serves the
+  dashboard getters. Every list `LIMIT` is clamped at the boundary
+  (`clampLimit`: undefined/non-finite/`<1` → the default, otherwise
+  `min(value, max)`), so a forged limit can never trigger an unbounded scan.
+- `scheduler.ts` — `runAggregation` plus two `node-cron` wrappers
+  (`AnalyticsAggregatorScheduler`, `WeeklyDigestScheduler`). Cron expressions are
+  validated at construction; `start`/`stop` are idempotent; the aggregator emits
+  `analytics:updated` after each roll-up so the UI refreshes live; the digest is
+  delivered best-effort over **both** Telegram and email, each in its own
+  try/catch so one channel's failure never blocks the other.
+
+**Cache tables (`migrations/0010-analytics.sql`).** Three day-keyed tables,
+each `UNIQUE` on its dimensions + `captured_for` so a re-run replaces rather than
+duplicates: `analytics_rollup` (platform × window × metric), `analytics_heatmap`
+(platform × day × hour), and `analytics_top_posts` (platform × window ×
+external_id).
+
+**HTTP.** `createAnalyticsRouter` mounts under `/api/analytics` behind a shared
+60-req/min/IP limiter: `GET /summary` (KPI totals + per-platform breakdown +
+`avgEngagementPerPost`), `GET /engagement` (the time series), `GET /heatmap`
+(buckets + dense matrix), and `GET /top-posts` (the leaderboard). `window` is
+validated against the allowed 7/30/90 set (defaulting to 30) and `platform`
+against `^[a-z0-9_-]{1,32}$`; anything malformed is a 422. The UI (`/analytics`)
+composes the KPI row, a recharts engagement line chart (the flat series is
+pivoted into per-day rows **client-side** so toggling the platform filter never
+refetches), the posting-time heatmap, and the top-posts leaderboard — all live
+on the `analytics:updated` socket event.
 
 ## 13. Security model
 

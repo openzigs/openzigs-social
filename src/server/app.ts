@@ -78,6 +78,12 @@ export interface AppDeps {
    */
   autoReplyRouter?: Router;
   /**
+   * Pre-built analytics dashboard router (epic #95), mounted at
+   * `/api/analytics` when provided. Built in ./index.ts from the analytics
+   * cache repository so this factory stays decoupled from the rollup internals.
+   */
+  analyticsRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -186,6 +192,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.autoReplyRouter) {
     api.use("/auto-reply", deps.autoReplyRouter);
+  }
+  if (deps.analyticsRouter) {
+    api.use("/analytics", deps.analyticsRouter);
   }
   app.use("/api", api);
 
