@@ -72,6 +72,12 @@ export interface AppDeps {
    */
   outboxRouter?: Router;
   /**
+   * Pre-built auto-reply / brand-voice router (epic #78), mounted at
+   * `/api/auto-reply` when provided. Built in ./index.ts from the rulebook +
+   * audit repos + pipeline so this factory stays decoupled from the internals.
+   */
+  autoReplyRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -172,6 +178,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.outboxRouter) {
     api.use("/outbox", deps.outboxRouter);
+  }
+  if (deps.autoReplyRouter) {
+    api.use("/auto-reply", deps.autoReplyRouter);
   }
   app.use("/api", api);
 

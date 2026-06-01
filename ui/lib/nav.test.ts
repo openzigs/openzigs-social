@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import { isActiveRoute, NAV_ROUTES } from "./nav";
 
 describe("NAV_ROUTES", () => {
-  it("exposes the six primary destinations in order", () => {
+  it("exposes the primary destinations in order", () => {
     expect(NAV_ROUTES.map((r) => r.label)).toEqual([
       "Inbox",
       "Compose",
       "Calendar",
+      "Outbox",
       "Analytics",
       "Contacts",
       "Settings"
@@ -19,6 +20,7 @@ describe("NAV_ROUTES", () => {
       "/inbox",
       "/compose",
       "/calendar",
+      "/outbox",
       "/analytics",
       "/contacts",
       "/settings"

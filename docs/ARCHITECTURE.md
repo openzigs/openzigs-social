@@ -109,6 +109,9 @@ Layout under the data directory:
 | `inbox/repository.ts` + `inbox/platform-limits.ts` | Unified thread/message read model (priority+recency sort, unread counts, FTS5 search) and per-platform reply limits (LinkedIn comments-only) (epic #71, #76/#77) |
 | `server/inbox/router.ts` | `/api/inbox/*` — threads, thread detail, mark-read, reply (via the #144 DM dispatcher), rules CRUD, firings, platform-limits; consumes the #143 SocialBrain store (epic #71) |
 | `server/connections/router.ts` | `GET /api/connections` — per-platform connect/needs-reconsent status (never echoes tokens) (#53) |
+| `personality/profiler.ts` + `personality/rulebook-repository.ts` | **Linguistic Profiler** — `scoreVoice()` token-overlap voice scorer (tone weighted 2:1 over exemplars, banned-word **veto** clamps to 0) + the single-row brand-voice rulebook store (epic #78, #79/#80) |
+| `routing/decision.ts` + `routing/pipeline.ts` + `routing/audit-repository.ts` | Confidence/voice **threshold gate** (inclusive `>=`), the evaluate→auto-send/queue→resolve pipeline, and the append-only `auto_reply_audit` store (epic #78, #81/#82) |
+| `server/auto-reply/router.ts` | `/api/auto-reply/*` — config, rulebook GET/PUT, draft `score`, `evaluate`, audit `resolve`, and the queryable audit log (epic #78, #83) |
 
 ## 5. UI map (`ui/`)
 
@@ -128,6 +131,8 @@ It runs on port `3001` in development and talks to the Node server (port
 | `app/compose/page.tsx` | Composer: per-account publish-target picker + post body (epic #53) |
 | `components/compose/publish-targets.tsx` | Publish-target checkbox list driven by `GET /api/connections` (#53) |
 | `lib/connections.ts` | `fetchConnections()` client for `GET /api/connections` (#53) |
+| `app/settings/page.tsx` + `components/auto-reply/` | Brand-voice rulebook editor (tone/banned-words/exemplars), hybrid-posture summary, and the decision log where queued drafts are reviewed/approved/edited/rejected with both scores surfaced (epic #78, #83) |
+| `lib/auto-reply.ts` | Auto-reply client: config/rulebook/score/audit fetchers + React Query hooks subscribed to `autoReply:*` socket events (epic #78) |
 | `components/top-nav.tsx` | Primary top navigation (active-route `aria-current`) + theme toggle |
 | `components/theme-provider.tsx` | Theme context backed by `useSyncExternalStore`; `localStorage` persistence + system-scheme tracking |
 | `components/theme-toggle.tsx` | System/light/dark dropdown toggle |
@@ -180,6 +185,13 @@ of the #127 SocialBrain store:
 | `inbox_rule_firings` | **Append-only** audit trail of every rule that fired against a message (FK → `inbox_rules`, **ON DELETE SET NULL** — firings are retained when a rule is deleted; migration `0006`) |
 | `inbox_thread_state` | Per-thread derived state — priority, flagged, `last_read_at` (PK/FK → `social_threads`, CASCADE) |
 | `social_messages_fts` | SQLite **FTS5** external-content index over `social_messages.body`, kept in sync by insert/update/delete triggers, powering inbox full-text search |
+
+`0008-auto-reply-audit.sql` (epic #78) adds the brand-voice + auto-reply tables:
+
+| Table | Purpose |
+|---|---|
+| `brand_voice_rulebook` | Single-row (`CHECK (id = 1)`) workspace voice config — `tone`, `banned_words_json`, `exemplars_json` — read by the profiler and edited from `/settings` |
+| `auto_reply_audit` | **Append-only** decision ledger — `thread_id`, `contact_id`, `platform`, `prompt`, `draft_text`, `final_text`, `confidence`, `voice_match`, `tone_match`, `banned_hits_json`, `decision` (`auto_send`/`queue`), `model`, `human_override`, `outcome` (`pending`/`sent`/`rejected`), timestamps. Indexed by `thread_id`, `created_at`, and `contact_id` (GDPR right-to-delete cascade, #138) |
 
 ## 7. Copilot SDK runtime + smart router + privacy mode
 
@@ -622,6 +634,83 @@ The server only starts the scheduler when `config.outbox.enabled` is true.
 truth for character/media caps (X = 280, LinkedIn = 3000, …) and is mirrored
 verbatim in `ui/lib/compose.ts` so the composer's counter and submit guard match
 the server's validation exactly.
+
+## 12.7 Brand voice + AI auto-reply pipeline (#78)
+
+The auto-reply pipeline scores an AI draft against the workspace's brand voice,
+gates it behind a confidence + voice-match threshold, and either auto-sends it
+or queues it for human approval — recording every decision in an append-only
+audit ledger. The domain lives in `src/personality/` (the Linguistic Profiler)
+and `src/routing/` (the threshold gate, pipeline, and audit store); the HTTP
+surface is `src/server/auto-reply/router.ts`; the UI is the `/settings` route.
+
+**Brand-voice rulebook.** `BrandVoiceRepository` (`src/personality/rulebook-repository.ts`)
+persists a single row (`brand_voice_rulebook`, `CHECK (id = 1)`) holding the
+`tone` descriptor, a `bannedWords` list, and `exemplars`. `normalizeRulebook()`
+trims and case-insensitively de-dupes each list at the boundary. An unset
+rulebook reads back as `{ tone: "", bannedWords: [], exemplars: [] }`.
+
+**Scoring (the Linguistic Profiler, #80).** `scoreVoice(draft, rulebook)`
+(`src/personality/profiler.ts`) returns a `VoiceScore` with an explicit
+`score`, `toneMatch`, `bannedWordPenalty`, and `bannedHits[]`, all in `[0, 1]`.
+The algorithm is deterministic, dependency-free token overlap:
+
+* The draft and the rulebook are tokenised into lower-cased word sets.
+* **Tone** tokens are weighted **2**, **exemplar** tokens weighted **1**, so
+  matching the tone descriptor matters twice as much as echoing an example.
+  `score = (2·|draftTone ∩ tone| + |draftExemplar ∩ exemplars|) / (2·|tone| + |exemplars|)`,
+  clamped to `[0, 1]`; an empty rulebook scores `0`.
+* **Banned-word veto.** Banned entries are matched as case-insensitive,
+  whitespace-collapsed substrings against the draft. **Any** hit is a hard veto:
+  the final `score` is clamped to **0** and the offending phrases are returned in
+  `bannedHits`. `toneMatch` is preserved (it reflects raw tone overlap before the
+  veto) so the UI can still show why an otherwise on-voice draft was blocked.
+
+**Threshold gate (#80).** `decideRouting(scores, thresholds)`
+(`src/routing/decision.ts`) compares `confidence` (from the model) and
+`voiceMatch` (from the profiler) against per-workspace thresholds
+(`config.autoReply.confidenceThreshold` default **0.85**,
+`config.autoReply.voiceThreshold` default **0.80**). Comparisons are
+**inclusive** (`>=`), so a draft sitting exactly on a threshold auto-sends. When
+a gate fails the decision carries human-readable `reasons` (e.g.
+`"confidence 0.8499 < 0.85"`), surfaced verbatim in the decision log.
+
+**Pipeline (#81).** `AutoReplyPipeline` (`src/routing/pipeline.ts`) is non-blocking
+and two-phase:
+
+* `evaluate(request)` scores the draft, runs the gate, and **always** records an
+  `auto_reply_audit` row (prompt, draft, both scores, decision, model). If the
+  hybrid posture is **enabled** (`config.autoReply.enabled`) **and** the gate
+  passes, it sends immediately and finalises the row `outcome = "sent"`
+  (emitting `autoReply:sent`); otherwise the row stays `pending` (status
+  `"queued"`, emitting `autoReply:queued`). Posture-off short-circuits to a queue
+  even for a perfect-scoring draft — a human is always in the loop until they opt
+  out.
+* `resolve(auditId, { approve, editedText? })` closes a queued row. **Approve**
+  sends `editedText ?? draftText` and sets `human_override = true` only when the
+  sent text differs from the original draft; **reject** finalises
+  `outcome = "rejected"` (emitting `autoReply:rejected`) and sends nothing.
+  Resolving a missing or already-resolved row throws `AutoReplyResolveError`.
+
+**Audit ledger (#82).** `AutoReplyAuditRepository` (`src/routing/audit-repository.ts`)
+owns the append-only `auto_reply_audit` table. `record()` inserts, `finalize()`
+sets the outcome (preserving an already-set `human_override`), and `list(filter)`
+queries newest-first by `thread_id` and/or a `since`/`until` time range with a
+boundary-normalised `LIMIT` (non-positive/non-finite → default 100, max 500, so a
+forged `LIMIT -1` can never return an unbounded set). Because the store is
+SQLite-on-disk in WAL mode, the ledger survives a restart. `deleteByContact()`
+backs the #138 GDPR right-to-delete cascade.
+
+**HTTP (#83).** `createAutoReplyRouter` mounts under `/api/auto-reply` behind a
+60-req/min/IP limiter: `GET /config` (posture + thresholds), `GET`/`PUT
+/rulebook` (422 on a malformed shape), `POST /score` (live voice score for a
+draft), `POST /evaluate` (validates `threadId`/`prompt`/`draft` non-empty and
+`confidence ∈ [0, 1]`, 201 on success), `POST /audit/:id/resolve` (422 on a
+missing `approve` boolean, 409 on an already-resolved row), and `GET /audit`
+(the queryable log). The UI (`/settings`) renders the rulebook editor, the
+hybrid-posture summary, and a decision log that surfaces **both** the confidence
+and voice scores on every row and lets a reviewer edit/approve/reject a queued
+draft.
 
 ## 13. Security model
 

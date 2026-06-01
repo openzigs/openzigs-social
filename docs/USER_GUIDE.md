@@ -221,7 +221,54 @@ message and why.
   LinkedIn comments. The same DM-hidden behaviour applies to other
   comments-only platforms (Threads, YouTube).
 
-## 8. Approvals over Telegram
+## 8. AI auto-reply with brand voice
+
+The **Settings** page (`/settings`) is where you teach the assistant your brand
+voice and decide how much it can do on its own. It has three parts.
+
+**Brand voice rulebook.** Describe how you sound and the assistant scores every
+draft against it:
+
+* **Tone** — a short descriptor of your voice (e.g. "warm, concise, helpful").
+  Words from your tone count **twice as much** as your examples when scoring a
+  draft.
+* **Banned words** — one phrase per line. These are a hard veto: if a draft
+  contains **any** banned phrase, its voice score is forced to **0** and the
+  draft is always held back, no matter how confident the model is.
+* **Exemplar replies** — one example reply per line. These nudge the score up
+  when a draft echoes how you actually write.
+
+Click **Save rulebook** to store it. The rulebook is saved on your machine and
+read every time a reply is scored.
+
+**Hybrid posture + thresholds.** The posture card shows whether auto-send is
+**on** or **off** and the two thresholds that gate it:
+
+* **Confidence** (default **0.85**) — how sure the model is about the reply.
+* **Voice match** (default **0.80**) — how well the draft fits your rulebook.
+
+A draft is **auto-sent only when auto-send is enabled and both scores meet or
+exceed their thresholds.** If auto-send is off, every draft is queued for you to
+review — a human stays in the loop until you opt out. A draft that just misses a
+threshold (say confidence 0.84) is queued with a plain-English reason like
+`confidence 0.8499 < 0.85`.
+
+**Decision log.** Every reply the assistant considers — sent or queued — appears
+in the decision log with **both** scores (confidence and voice match shown as
+percentages), the decision, and any banned-word hits. For a **queued** draft you
+can:
+
+* **Edit** the text in place before approving (the row is flagged "human
+  override" so you can see you changed it),
+* **Approve** to send it as-is or as edited, or
+* **Reject** to discard it.
+
+Nothing is ever lost: the log is an append-only record of the prompt, the draft,
+the final text, the scores, the decision, the model, and the timestamp. It
+survives restarts, is searchable by conversation and time range, and the
+underlying data is removed when you exercise your right-to-delete for a contact.
+
+## 9. Approvals over Telegram
 
 Once a bot is connected and the channel is enabled, Telegram becomes your
 remote control. The bot is **deny-by-default**: it only obeys your configured
@@ -249,7 +296,7 @@ lists everything still pending.
 a social platform is connected, the bot reports that DM delivery is unavailable
 rather than faking a send.
 
-## 9. Privacy mode
+## 10. Privacy mode
 
 Three modes:
 
@@ -266,7 +313,7 @@ Three modes:
 Switch modes from the UI privacy panel or programmatically via
 `wrapper.setPrivacyMode("session" | "global" | "off")`.
 
-## 10. Where are my credentials stored?
+## 11. Where are my credentials stored?
 
 In an encrypted vault at `~/.openzigs-social/auth.json` (file mode
 `0o600`, parent directory `0o700`). The vault uses AES-256-GCM envelope
@@ -332,7 +379,7 @@ The server exposes a few operational endpoints (bound to
 The same `metrics` snapshot is pushed to connected UIs over Socket.IO as a
 `metrics:update` event whenever a counter changes.
 
-## 11. Troubleshooting
+## 13. Troubleshooting
 
 ### "Ollama unreachable" warning on launch
 
