@@ -108,7 +108,12 @@ export function createCorsMiddleware(allowedOrigin: string) {
     const origin = req.headers.origin;
     if (origin === allowedOrigin) {
       res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      // Single source of truth for the methods the API actually serves across
+      // every mounted router. PUT is used by the brand-voice rulebook (#78) and
+      // inbox rule updates (#71); DELETE by inbox rule removal (#71). Keep this
+      // list in sync when a router adds a new verb — the CORS layer is global,
+      // so an omitted method silently breaks cross-origin preflight.
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
       res.setHeader("Access-Control-Max-Age", "600");
     }

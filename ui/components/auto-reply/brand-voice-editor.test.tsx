@@ -51,4 +51,57 @@ describe("BrandVoiceEditor", () => {
     render(<BrandVoiceEditor rulebook={EMPTY} onSave={() => {}} error="nope" />);
     expect(screen.getByRole("alert")).toHaveTextContent("nope");
   });
+
+  it("blocks save and surfaces the offending word when an exemplar contains a banned word", () => {
+    const onSave = vi.fn();
+    render(<BrandVoiceEditor rulebook={EMPTY} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("Banned words"), { target: { value: "spam" } });
+    fireEvent.change(screen.getByLabelText("Exemplar replies"), {
+      target: { value: "Thanks, this is not Spam at all." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save rulebook/i }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Exemplar contains banned word .*spam/i);
+  });
+
+  it("blocks save on a duplicate banned word", () => {
+    const onSave = vi.fn();
+    render(<BrandVoiceEditor rulebook={EMPTY} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("Banned words"), {
+      target: { value: "spam\nSPAM" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save rulebook/i }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Duplicate banned word/i);
+  });
+
+  it("blocks save on a whitespace-only banned-word entry", () => {
+    const onSave = vi.fn();
+    render(<BrandVoiceEditor rulebook={EMPTY} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("Banned words"), {
+      target: { value: "spam\n   \nact now" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save rulebook/i }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/can.t be blank/i);
+  });
+
+  it("saves cleanly when input is valid and no banned word appears in an exemplar", () => {
+    const onSave = vi.fn();
+    render(<BrandVoiceEditor rulebook={EMPTY} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "warm concise" } });
+    fireEvent.change(screen.getByLabelText("Banned words"), {
+      target: { value: "spam\nact now" }
+    });
+    fireEvent.change(screen.getByLabelText("Exemplar replies"), {
+      target: { value: "Thanks so much for reaching out!" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save rulebook/i }));
+    expect(onSave).toHaveBeenCalledWith({
+      tone: "warm concise",
+      bannedWords: ["spam", "act now"],
+      exemplars: ["Thanks so much for reaching out!"]
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 });

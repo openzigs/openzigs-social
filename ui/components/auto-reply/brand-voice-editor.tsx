@@ -24,6 +24,55 @@ function toList(value: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+/** Normalise a token the way the server profiler does (#80): lowercase, collapse runs of whitespace. */
+function normalise(value: string): string {
+  return value.toLowerCase().trim().replace(/\s+/gu, " ");
+}
+
+/**
+ * Client-side rulebook validation (#83 AC). Surfaces problems to the user before
+ * the save hits the API. Mirrors the server-side banned-word matching so the
+ * editor blocks input the pipeline would silently neuter. Returns the first
+ * problem found, or `undefined` when the rulebook is valid.
+ */
+export function validateRulebook(bannedRaw: string, exemplarsRaw: string): string | undefined {
+  // 1. Reject whitespace-only banned-word entries (a line that is blank after
+  //    trimming but was non-empty — e.g. "   ").
+  const hasBlankBanned = bannedRaw
+    .split("\n")
+    .some((line) => line.length > 0 && line.trim().length === 0);
+  if (hasBlankBanned) {
+    return "Banned words can’t be blank — remove the empty line.";
+  }
+
+  const bannedWords = toList(bannedRaw);
+
+  // 2. Reject duplicate banned words (case-insensitive, whitespace-normalised).
+  const seen = new Set<string>();
+  for (const word of bannedWords) {
+    const key = normalise(word);
+    if (seen.has(key)) {
+      return `Duplicate banned word: “${word}”.`;
+    }
+    seen.add(key);
+  }
+
+  // 3. Reject exemplars that contain a configured banned word — the auto-reply
+  //    pipeline would clamp such a reply to 0, so it must never be an exemplar.
+  const exemplars = toList(exemplarsRaw);
+  for (const exemplar of exemplars) {
+    const haystack = normalise(exemplar);
+    for (const word of bannedWords) {
+      const needle = normalise(word);
+      if (needle.length > 0 && haystack.includes(needle)) {
+        return `Exemplar contains banned word “${word}”. Remove it before saving.`;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Brand-voice rulebook editor (#83). Edits the workspace tone descriptor, the
  * banned-word list, and exemplar replies that train the Linguistic Profiler.
@@ -40,6 +89,7 @@ export function BrandVoiceEditor({
   const [tone, setTone] = React.useState(rulebook.tone);
   const [bannedWords, setBannedWords] = React.useState(rulebook.bannedWords.join("\n"));
   const [exemplars, setExemplars] = React.useState(rulebook.exemplars.join("\n"));
+  const [validationError, setValidationError] = React.useState<string | undefined>(undefined);
 
   // Re-seed during render when the upstream rulebook reference changes (query
   // resolves). Adjusting state in render — rather than an effect — is the
@@ -50,10 +100,17 @@ export function BrandVoiceEditor({
     setTone(rulebook.tone);
     setBannedWords(rulebook.bannedWords.join("\n"));
     setExemplars(rulebook.exemplars.join("\n"));
+    setValidationError(undefined);
   }
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
+    const problem = validateRulebook(bannedWords, exemplars);
+    if (problem) {
+      setValidationError(problem);
+      return;
+    }
+    setValidationError(undefined);
     onSave({
       tone: tone.trim(),
       bannedWords: toList(bannedWords),
@@ -129,9 +186,9 @@ export function BrandVoiceEditor({
           </span>
         )}
       </div>
-      {error && (
+      {(validationError ?? error) && (
         <p role="alert" className="text-xs text-destructive">
-          {error}
+          {validationError ?? error}
         </p>
       )}
     </form>

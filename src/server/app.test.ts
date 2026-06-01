@@ -166,6 +166,29 @@ describe("createApp CORS", () => {
     expect(res.headers.get("vary")).toContain("Origin");
   });
 
+  it("advertises PUT (and DELETE) on an OPTIONS preflight for the rulebook write endpoint", async () => {
+    const app = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true }),
+      vault: makeVault(),
+      uiOrigin: UI_ORIGIN
+    });
+    ({ server, base } = await listen(app));
+    const res = await fetch(`${base}/api/auto-reply/rulebook`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: UI_ORIGIN,
+        "Access-Control-Request-Method": "PUT",
+        "Access-Control-Request-Headers": "content-type"
+      }
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(UI_ORIGIN);
+    const methods = res.headers.get("access-control-allow-methods") ?? "";
+    expect(methods).toContain("PUT");
+    expect(methods).toContain("DELETE");
+  });
+
   it("does not echo a disallowed origin (no wildcard, no reflection)", async () => {
     const app = createApp({
       metrics: new Metrics(),
