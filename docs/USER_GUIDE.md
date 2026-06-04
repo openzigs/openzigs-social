@@ -390,6 +390,14 @@ your progress is remembered between visits.
   recommended variant (or override it), then **Use this model**; if it isn't
   downloaded yet, **Pull** fetches it. Prefer a hosted model? Add an OpenAI,
   Anthropic, or OpenAI-compatible key and the matching provider chip lights up.
+
+  > **Ollama version requirement.** The recommended high-RAM model
+  > (`gemma4:12b`, selected for ≥ 16 GiB) requires **Ollama ≥ 0.30.5**.
+  > If your daemon is older, the Pull button shows an "Update Ollama" prompt
+  > with a direct download link instead of attempting the pull. Update via
+  > the [official installer](https://ollama.com/download) or, if you installed
+  > via Homebrew, run `brew upgrade ollama` once Homebrew ships 0.30.5+.
+  > The smaller edge variants (`gemma4:e2b`, `gemma4:e4b`) have no version floor.
 - **Connect platforms.** Each platform shows whether its app credentials are
   configured and whether you're connected. **Connect** opens the platform's
   authorization page in a new tab.
@@ -529,6 +537,24 @@ running, the app falls back to whichever BYOK provider you have
 configured. Start Ollama (`ollama serve`) and either install a Gemma 4
 variant manually (`ollama pull gemma4:e2b`) or accept the in-app prompt
 on next launch.
+
+### Pull says "Your local Ollama is out of date"
+
+The onboarding Model panel showed this message when you clicked **Pull** for
+`gemma4:12b` (the default for machines with ≥ 16 GiB RAM). This model requires
+**Ollama ≥ 0.30.5** — older daemons reject the pull with an HTTP 412.
+
+To fix:
+1. Download the latest Ollama from <https://ollama.com/download> and run the
+   installer, **or** if you installed via Homebrew run `brew upgrade ollama`
+   (available once Homebrew publishes the 0.30.5 bottle).
+2. Restart the Ollama daemon (`brew services restart ollama` or reopen the
+   Ollama desktop app).
+3. Return to the Onboarding tab and click **Pull** again.
+
+Alternatively, switch to a smaller edge variant (`gemma4:e4b` for 8–16 GiB,
+`gemma4:e2b` for < 8 GiB) — these have no version floor and run on any current
+Ollama release.
 
 ### A platform connector says "needs reconsent"
 
