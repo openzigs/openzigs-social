@@ -252,9 +252,9 @@ which composes four collaborators:
 ### Ollama / Gemma 4 default
 
 `createOllamaProvider()` defaults to Gemma 4. `pickGemma4Variant(totalmem)`
-picks by host RAM (`e2b` < 8 GiB, `e4b` 8–16 GiB, `e8b` ≥ 16 GiB).
+picks by host RAM (`e2b` < 8 GiB, `e4b` 8–16 GiB, `12b` ≥ 16 GiB).
 `probeOllama()` hits `/api/tags` and `pickInstalledGemma4()` prefers the
-largest installed variant (`e8b` > `e4b` > `e2b`).
+largest installed variant (`12b` > `e4b` > `e2b`).
 
 ### Copilot SDK v0.2 → v0.3 migration (issue #130)
 
@@ -860,6 +860,62 @@ composes the KPI row, a recharts engagement line chart (the flat series is
 pivoted into per-day rows **client-side** so toggling the platform filter never
 refetches), the posting-time heatmap, and the top-posts leaderboard — all live
 on the `analytics:updated` socket event.
+
+## 12.10 Onboarding polish — model, OAuth, Meta app, recipes, tour (#100)
+
+The onboarding layer is the guided first-run polish flow. Every step is
+independently skippable and the whole flow (plus the contextual tour) is
+re-launchable from the `/onboarding` admin panel; per-user progress lives in the
+browser's `localStorage`, so it is intentionally client-side state, not server
+state.
+
+**Server module map.**
+
+- `src/server/model/selection-store.ts` — `ModelSelectionStore`, an in-memory
+  record of the active model selection (`{provider, model?}` + `source`).
+- `src/server/model/router.ts` — `createModelRouter({vault, selection})`.
+  `GET /api/model/status` probes the local Ollama daemon (installed models +
+  recommended RAM-sized Gemma 4 variant from `GEMMA4_VARIANTS`) and reports the
+  configured BYOK providers (`BYOK_PROVIDERS`) using only boolean `configured`
+  flags — key material is never serialized. `POST /select` requires a `model`
+  for local selections (400) and a configured provider for BYOK (409).
+  `POST /pull` validates the tag against `MODEL_TAG_RE`
+  (`/^[a-z0-9][a-z0-9:._-]{0,63}$/`) before proxying to `${host}/api/pull`,
+  returning 502 on upstream failure. The Ollama HTTP API is injected as a
+  `FetchLike` so tests mock it — no real downloads ever run in CI.
+- `src/server/social-setup/platforms.ts` — `SOCIAL_PLATFORMS` + `PLATFORM_SETUP`
+  metadata, `resolveClientId(vault, credential)` (vault-only), and
+  `buildAuthorizeUrl(meta, {clientId, redirectUri, state})` which embeds only the
+  non-secret app id, scopes, redirect URI, and a CSRF `state`.
+- `src/server/social-setup/router.ts` —
+  `createSocialSetupRouter({vault, stateStore, publicBaseUrl?})`.
+  `GET /status` reports each platform's `appConfigured` / `connected` /
+  `needsReconsent` state; `POST /:platform/authorize` mints the authorize URL
+  (404 unknown platform, 409 when no client id is configured);
+  `POST /meta/app` stores the App ID + Secret in the vault and returns the
+  copy-pasteable scopes + per-platform redirect URIs — the App **Secret is
+  write-only and never echoed back** (secret-leak defense).
+- `src/server/onboarding/recipes.ts` — `STARTER_RECIPES` (creator / small-biz /
+  agency presets: tone, banned words, exemplars, suggested platforms, weekly
+  cadence), `parseBrandVoiceImport(content, format)` (JSON/CSV), and
+  `mergeBrandVoice(current, incoming)`.
+- `src/server/onboarding/router.ts` — `createOnboardingRouter({brandVoice})`.
+  `GET /recipes`; `POST /recipes/apply` seeds the brand-voice rulebook and
+  returns the suggested platform set + cadence; `POST /brand-voice/import`
+  parses pasted/uploaded exemplars (422 on empty/unparseable content) and merges
+  them into the rulebook, building the exemplar vocabulary the linguistic
+  profiler (§12.7) scores against.
+
+**UI.** `ui/lib/onboarding.ts` is the single client surface: plain async
+fetchers (mirroring `ui/lib/setup.ts`, not react-query) plus two
+`useSyncExternalStore`-backed `localStorage` stores — one for the tour dismissal
+state (`ozs.onboarding.tour`) and one for step progress
+(`ozs.onboarding.progress`). The components under `ui/components/onboarding/`
+(`ModelPanel`, `SocialConnectStep`, `MetaAppWizard`, `RecipePicker`,
+`BrandVoiceImport`, `TourOverlay`, `OnboardingPanel`) compose the tabbed wizard
+mounted at `/onboarding` (reachable from the top-nav), and `TourOverlay` renders
+the dismissible coach-marks on the inbox, scheduler (calendar), and brand-voice
+(settings) surfaces.
 
 ## 13. Security model
 

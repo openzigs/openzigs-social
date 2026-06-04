@@ -50,6 +50,10 @@ import { AnalyticsAggregatorScheduler, WeeklyDigestScheduler } from "../analytic
 import { createMailer } from "../analytics/mailer.js";
 import { createContactsRouter } from "./crm/router.js";
 import { CrmRepository } from "../crm/index.js";
+import { createModelRouter } from "./model/router.js";
+import { ModelSelectionStore } from "./model/selection-store.js";
+import { createSocialSetupRouter } from "./social-setup/router.js";
+import { createOnboardingRouter } from "./onboarding/router.js";
 import { BrandVoiceRepository } from "../personality/rulebook-repository.js";
 import { AutoReplyAuditRepository } from "../routing/audit-repository.js";
 import { AutoReplyPipeline } from "../routing/pipeline.js";
@@ -446,6 +450,22 @@ export async function startServer(): Promise<StartedServer> {
     emit: (event, payload) => quotaSink.emit?.(event, payload)
   });
 
+  // Onboarding polish (epic #100). The model panel (#102) probes the local
+  // Ollama runtime and persists the active model selection; the social-setup
+  // router (#105/#106) drives per-platform OAuth + the Meta app wizard; the
+  // onboarding router (#107 + epic AC) serves starter recipes and brand-voice
+  // import (reusing the auto-reply brand-voice repository as the single source).
+  const modelRouter = createModelRouter({
+    vault,
+    selection: new ModelSelectionStore()
+  });
+  const socialSetupRouter = createSocialSetupRouter({
+    vault,
+    stateStore: new OAuthStateStore({ ttlMs: config.platform.oauth.stateTtlMs }),
+    publicBaseUrl: `http://localhost:${config.server.port}`
+  });
+  const onboardingRouter = createOnboardingRouter({ brandVoice: autoReplyRulebook });
+
   const app = createApp({
     metrics,
     checkReadiness: buildReadinessCheck(db),
@@ -457,7 +477,10 @@ export async function startServer(): Promise<StartedServer> {
     outboxRouter,
     autoReplyRouter,
     analyticsRouter,
-    contactsRouter
+    contactsRouter,
+    modelRouter,
+    socialSetupRouter,
+    onboardingRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {

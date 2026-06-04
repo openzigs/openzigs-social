@@ -109,6 +109,66 @@ describe("OpenAICompatibleProvider", () => {
     const out = await collect(p.chat({ messages: [{ role: "user", content: "hi" }] }));
     expect(out.find((c) => c.delta === "x")).toBeTruthy();
   });
+
+  it("omits max_tokens when no cap is provided (local thinking models run to completion)", async () => {
+    let capturedBody: Record<string, unknown> = {};
+    globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return sseChunks(["data: [DONE]\n"]);
+    }) as unknown as typeof fetch;
+    const p = new OpenAICompatibleProvider({
+      kind: "openai-compatible",
+      name: "ollama",
+      baseUrl: "http://localhost:11434/v1",
+      model: "gemma4:12b",
+      isLocal: true
+    });
+    await collect(p.chat({ messages: [{ role: "user", content: "hi" }] }));
+    expect("max_tokens" in capturedBody).toBe(false);
+  });
+
+  it("sends max_tokens only when a cap is explicitly provided", async () => {
+    let capturedBody: Record<string, unknown> = {};
+    globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return sseChunks(["data: [DONE]\n"]);
+    }) as unknown as typeof fetch;
+    const p = new OpenAICompatibleProvider({
+      kind: "openai-compatible",
+      name: "ollama",
+      baseUrl: "http://localhost:11434/v1",
+      model: "gemma4:12b"
+    });
+    await collect(p.chat({ messages: [{ role: "user", content: "hi" }], maxTokens: 256 }));
+    expect(capturedBody.max_tokens).toBe(256);
+  });
+
+  it("concatenates content deltas and ignores reasoning-only deltas (thinking models)", async () => {
+    // gemma4:12b is a "thinking" model: it emits a separate `reasoning` field
+    // and burns completion tokens before producing `content`. A reasoning-only
+    // delta must not corrupt or empty the surfaced output.
+    globalThis.fetch = vi.fn(async () =>
+      sseChunks([
+        'data: {"choices":[{"delta":{"reasoning":"let me think"}}]}\n',
+        'data: {"choices":[{"delta":{"content":"Hel"}}]}\n',
+        'data: {"choices":[{"delta":{"reasoning":"still thinking"}}]}\n',
+        'data: {"choices":[{"delta":{"content":"lo"}}]}\n',
+        "data: [DONE]\n"
+      ])
+    ) as typeof fetch;
+    const p = new OpenAICompatibleProvider({
+      kind: "openai-compatible",
+      name: "ollama",
+      baseUrl: "http://localhost:11434/v1",
+      model: "gemma4:12b"
+    });
+    const chunks = await collect(p.chat({ messages: [{ role: "user", content: "hi" }] }));
+    const text = chunks
+      .filter((c) => c.delta)
+      .map((c) => c.delta)
+      .join("");
+    expect(text).toBe("Hello");
+  });
 });
 
 describe("AnthropicProvider", () => {

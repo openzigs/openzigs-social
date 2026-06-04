@@ -11,6 +11,7 @@ describe("NAV_ROUTES", () => {
       "Outbox",
       "Analytics",
       "Contacts",
+      "Onboarding",
       "Settings"
     ]);
   });
@@ -23,6 +24,7 @@ describe("NAV_ROUTES", () => {
       "/outbox",
       "/analytics",
       "/contacts",
+      "/onboarding",
       "/settings"
     ]);
   });

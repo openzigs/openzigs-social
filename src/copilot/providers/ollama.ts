@@ -25,30 +25,32 @@ export interface OllamaTagsResponse {
  *
  *  - < 8 GiB              → `gemma4:e2b`
  *  - 8 GiB ≤ x < 16 GiB   → `gemma4:e4b`
- *  - 16 GiB ≤ x < 32 GiB  → `gemma4:e8b`  (per ollama tag catalog)
- *  - ≥ 32 GiB             → `gemma4:e8b`  (largest commonly-pullable variant)
+ *  - ≥ 16 GiB             → `gemma4:12b`
  *
- * Issue #31 also calls out a 26b / 31b roadmap; those are gated behind a
- * future ENABLE_GEMMA4_BIG flag.
+ * `e2b` / `e4b` are Gemma effective-parameter edge models (that line tops out
+ * at E4B — there is no `e8b`). `gemma4:12b` (released 2026-06-03) is a dense,
+ * encoder-free multimodal model sized for ~16 GB unified-memory machines, which
+ * makes it the correct default for the high-RAM tier.
+ *
+ * The 26b / 31b roadmap is gated behind a future ENABLE_GEMMA4_BIG flag.
  */
 export function pickGemma4Variant(totalMemBytes: number = totalmem()): string {
   const gib = totalMemBytes / (1024 * 1024 * 1024);
   if (gib < 8) return "gemma4:e2b";
   if (gib < 16) return "gemma4:e4b";
-  return "gemma4:e8b";
+  return "gemma4:12b";
 }
 
 /**
  * From an Ollama `/api/tags` response, choose the largest installed Gemma 4
  * variant in this preference order:
- *   `gemma4:e8b` > `gemma4:e4b` > `gemma4:e2b`
- * (per acceptance criteria on issue #31).
+ *   `gemma4:12b` > `gemma4:e4b` > `gemma4:e2b`
  */
 export function pickInstalledGemma4(tags: OllamaTagsResponse | undefined): string | undefined {
   const names = new Set(
     (tags?.models ?? []).map((t) => t.name ?? t.model ?? "").filter((n) => n.length > 0)
   );
-  for (const candidate of ["gemma4:e8b", "gemma4:e4b", "gemma4:e2b"]) {
+  for (const candidate of ["gemma4:12b", "gemma4:e4b", "gemma4:e2b"]) {
     if (names.has(candidate)) return candidate;
   }
   return undefined;

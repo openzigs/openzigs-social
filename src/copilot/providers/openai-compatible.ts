@@ -39,6 +39,11 @@ export class OpenAICompatibleProvider implements Provider {
       stream: true,
       messages: opts.messages,
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      // Only send `max_tokens` when a caller explicitly caps it. Local "thinking"
+      // models (e.g. gemma4:12b) spend completion tokens on a separate
+      // `reasoning` field before emitting `content`, so a tiny `max_tokens` can
+      // be exhausted by reasoning and yield empty `content`. Callers must not set
+      // a small cap for local models; omitting it lets Ollama run to completion.
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {})
     };
 

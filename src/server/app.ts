@@ -90,6 +90,24 @@ export interface AppDeps {
    */
   contactsRouter?: Router;
   /**
+   * Pre-built model panel router (epic #100, sub #102), mounted at
+   * `/api/model` when provided. Surfaces the Ollama probe, Gemma 4 variant
+   * recommendation, BYOK provider chips, and the active model selection.
+   */
+  modelRouter?: Router;
+  /**
+   * Pre-built social setup router (epic #100, sub #105/#106), mounted at
+   * `/api/social-setup` when provided. Drives the per-platform OAuth flow and
+   * the per-user Meta app wizard.
+   */
+  socialSetupRouter?: Router;
+  /**
+   * Pre-built onboarding router (epic #100, sub #107 + epic AC), mounted at
+   * `/api/onboarding` when provided. Serves the starter recipe presets and
+   * brand-voice import.
+   */
+  onboardingRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -204,6 +222,15 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.contactsRouter) {
     api.use("/contacts", deps.contactsRouter);
+  }
+  if (deps.modelRouter) {
+    api.use("/model", deps.modelRouter);
+  }
+  if (deps.socialSetupRouter) {
+    api.use("/social-setup", deps.socialSetupRouter);
+  }
+  if (deps.onboardingRouter) {
+    api.use("/onboarding", deps.onboardingRouter);
   }
   app.use("/api", api);
 
