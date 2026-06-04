@@ -1,4 +1,4 @@
-# Graph Report - openzigs-social  (2026-06-01)
+# Graph Report - openzigs-social  (2026-06-04)
 
 ## Corpus Check
 - 413 files · ~191,097 words
