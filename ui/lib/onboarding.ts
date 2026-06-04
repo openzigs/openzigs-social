@@ -61,6 +61,12 @@ export interface PullModelResult {
   model: string;
   status: string;
   error?: string;
+  /** Set when Ollama's version gate (HTTP 412) blocked the pull. */
+  code?: "ollama_outdated";
+  /** Minimum Ollama version required to pull the model (when `code` is set). */
+  minVersion?: string;
+  /** Where to download a newer Ollama (when `code` is set). */
+  updateUrl?: string;
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {

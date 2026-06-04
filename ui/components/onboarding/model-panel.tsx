@@ -20,6 +20,10 @@ export function ModelPanel({ onComplete }: { onComplete?: () => void } = {}) {
   const [error, setError] = React.useState(false);
   const [choice, setChoice] = React.useState<string>("");
   const [busy, setBusy] = React.useState(false);
+  const [pullError, setPullError] = React.useState<{
+    message: string;
+    updateUrl?: string;
+  } | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -87,11 +91,20 @@ export function ModelPanel({ onComplete }: { onComplete?: () => void } = {}) {
 
   const handlePull = async (): Promise<void> => {
     setBusy(true);
+    setPullError(null);
     try {
       const result = await pullModel(choice);
       if (result.pulling) {
         toast({ title: "Pulling model", description: `${choice}: ${result.status}` });
         await load();
+      } else if (result.code === "ollama_outdated") {
+        // Ollama's version gate (HTTP 412 → 409). Surface an actionable message
+        // with the update link instead of a generic "pull failed".
+        setPullError({
+          message:
+            result.error ?? "Your local Ollama is out of date. Update it to pull this model.",
+          updateUrl: result.updateUrl
+        });
       } else {
         toast({ title: "Pull failed", description: result.error, variant: "destructive" });
       }
@@ -156,6 +169,26 @@ export function ModelPanel({ onComplete }: { onComplete?: () => void } = {}) {
             </Button>
           ) : null}
         </div>
+
+        {pullError ? (
+          <div
+            role="alert"
+            data-testid="pull-error"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <p>{pullError.message}</p>
+            {pullError.updateUrl ? (
+              <a
+                href={pullError.updateUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-block font-medium underline"
+              >
+                Download the latest Ollama
+              </a>
+            ) : null}
+          </div>
+        ) : null}
 
         <div>
           <p className="mb-2 text-sm font-medium">Bring your own key</p>

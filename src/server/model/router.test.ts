@@ -245,6 +245,33 @@ describe("model router", () => {
       expect(res.status).toBe(502);
     });
 
+    it("maps an Ollama 412 (version gate) to a structured 409 with an update hint", async () => {
+      // Ollama replies 412 + plain text when the local runtime is too old to
+      // pull a newly released model (e.g. gemma4:12b needs Ollama >= 0.30.5).
+      const fetchImpl = vi.fn(
+        async () =>
+          new Response(
+            "The model you are attempting to pull requires a newer version of Ollama. " +
+              "Please download the latest version at: https://ollama.com/download",
+            { status: 412 }
+          )
+      ) as unknown as typeof fetch;
+      await mount({ fetchImpl });
+      const res = await fetch(`${base}/api/model/pull`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: "gemma4:12b" })
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as Record<string, any>;
+      expect(body.code).toBe("ollama_outdated");
+      expect(body.minVersion).toBe("0.30.5");
+      expect(body.updateUrl).toBe("https://ollama.com/download");
+      expect(body.error).toMatch(/0\.30\.5/);
+      // Must not echo upstream's raw text back to the client.
+      expect(body.error).not.toContain("attempting to pull");
+    });
+
     it("rejects a missing model (400)", async () => {
       await mount();
       const res = await fetch(`${base}/api/model/pull`, {

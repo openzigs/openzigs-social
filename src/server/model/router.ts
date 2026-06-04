@@ -209,6 +209,21 @@ export function createModelRouter(deps: ModelRouterDeps): Router {
         res.status(502).json({ error: "ollama unreachable" });
         return;
       }
+      // A 412 is Ollama's version gate: the local runtime is too old to pull a
+      // newly released model (e.g. gemma4:12b needs Ollama >= 0.30.5). Surface a
+      // distinct, machine-readable shape so the UI can render an update prompt
+      // instead of a generic failure. We do not echo upstream's raw body — a
+      // fixed message avoids leaking anything and is safe to render.
+      if (upstream.status === 412) {
+        res.status(409).json({
+          error:
+            "Your local Ollama is out of date. Update it to v0.30.5 or newer to pull this model.",
+          code: "ollama_outdated",
+          minVersion: "0.30.5",
+          updateUrl: "https://ollama.com/download"
+        });
+        return;
+      }
       if (!upstream.ok) {
         res.status(502).json({ error: "ollama pull failed" });
         return;

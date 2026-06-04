@@ -118,6 +118,28 @@ describe("ModelPanel", () => {
     );
   });
 
+  it("renders an actionable update prompt when Ollama is out of date", async () => {
+    fetchModelStatus.mockResolvedValue(status());
+    pullModel.mockResolvedValue({
+      pulling: false,
+      model: "gemma4:12b",
+      status: "",
+      error: "Your local Ollama is out of date. Update it to v0.30.5 or newer to pull this model.",
+      code: "ollama_outdated",
+      minVersion: "0.30.5",
+      updateUrl: "https://ollama.com/download"
+    });
+    render(<ModelPanel />);
+    await waitFor(() => screen.getByRole("button", { name: /pull/i }));
+    fireEvent.click(screen.getByRole("button", { name: /pull/i }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/0\.30\.5/);
+    const link = screen.getByRole("link", { name: /download the latest ollama/i });
+    expect(link).toHaveAttribute("href", "https://ollama.com/download");
+    // A version-gate failure must not be surfaced as a generic "Pull failed" toast.
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Pull failed" }));
+  });
+
   it("hides the pull button when ollama is unreachable", async () => {
     fetchModelStatus.mockResolvedValue(
       status({
