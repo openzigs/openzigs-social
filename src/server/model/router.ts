@@ -50,7 +50,7 @@ const BYOK_LABELS: Record<ByokProvider, string> = {
 };
 
 /** Gemma 4 variants, best → floor (mirrors the acceptance-criteria table). */
-export const GEMMA4_VARIANTS = ["gemma4:e8b", "gemma4:e4b", "gemma4:e2b"] as const;
+export const GEMMA4_VARIANTS = ["gemma4:12b", "gemma4:e4b", "gemma4:e2b"] as const;
 
 /** Allowlist for a pullable model tag — letters/digits and `:._-` only. */
 const MODEL_TAG_RE = /^[a-z0-9][a-z0-9:._-]{0,63}$/;

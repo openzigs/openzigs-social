@@ -18,18 +18,24 @@ describe("pickGemma4Variant", () => {
     expect(pickGemma4Variant(8 * GiB)).toBe("gemma4:e4b");
     expect(pickGemma4Variant(15 * GiB)).toBe("gemma4:e4b");
   });
-  it("returns e8b on large hosts", () => {
-    expect(pickGemma4Variant(16 * GiB)).toBe("gemma4:e8b");
-    expect(pickGemma4Variant(64 * GiB)).toBe("gemma4:e8b");
+  it("returns 12b on large hosts", () => {
+    expect(pickGemma4Variant(16 * GiB)).toBe("gemma4:12b");
+    expect(pickGemma4Variant(64 * GiB)).toBe("gemma4:12b");
+  });
+  it("maps the 16 GiB boundary to 12b and just under to e4b", () => {
+    expect(pickGemma4Variant(16 * GiB)).toBe("gemma4:12b");
+    expect(pickGemma4Variant(15.99 * GiB)).toBe("gemma4:e4b");
   });
 });
 
 describe("pickInstalledGemma4", () => {
-  it("prefers e8b > e4b > e2b", () => {
-    expect(pickInstalledGemma4({ models: [{ name: "gemma4:e2b" }, { name: "gemma4:e8b" }] })).toBe(
-      "gemma4:e8b"
+  it("prefers 12b > e4b > e2b", () => {
+    expect(pickInstalledGemma4({ models: [{ name: "gemma4:e2b" }, { name: "gemma4:12b" }] })).toBe(
+      "gemma4:12b"
     );
-    expect(pickInstalledGemma4({ models: [{ name: "gemma4:e4b" }] })).toBe("gemma4:e4b");
+    expect(
+      pickInstalledGemma4({ models: [{ name: "gemma4:e2b" }, { name: "gemma4:e4b" }] })
+    ).toBe("gemma4:e4b");
   });
   it("returns undefined when no variant installed", () => {
     expect(pickInstalledGemma4({ models: [{ name: "llama3" }] })).toBeUndefined();
@@ -74,8 +80,8 @@ describe("createOllamaProvider", () => {
   });
 
   it("respects explicit model + baseUrl overrides", () => {
-    const p = createOllamaProvider({ model: "gemma4:e8b", baseUrl: "http://x/v1" });
-    expect(p.config.model).toBe("gemma4:e8b");
+    const p = createOllamaProvider({ model: "gemma4:12b", baseUrl: "http://x/v1" });
+    expect(p.config.model).toBe("gemma4:12b");
     expect(p.config.baseUrl).toBe("http://x/v1");
   });
 });

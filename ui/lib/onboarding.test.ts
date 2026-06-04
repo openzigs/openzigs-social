@@ -47,7 +47,7 @@ describe("onboarding API client", () => {
         baseUrl: "http://localhost:11434/v1",
         installedVariant: null,
         recommendedVariant: "gemma4:e4b",
-        variants: ["gemma4:e8b", "gemma4:e4b", "gemma4:e2b"],
+        variants: ["gemma4:12b", "gemma4:e4b", "gemma4:e2b"],
         models: []
       },
       providers: [{ id: "openai", label: "OpenAI", configured: false }],
@@ -141,15 +141,13 @@ describe("onboarding API client", () => {
   });
 
   it("imports brand voice", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        jsonResponse({
-          imported: true,
-          added: 2,
-          rulebook: { tone: "", bannedWords: [], exemplars: ["a", "b"] }
-        })
-      );
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({
+        imported: true,
+        added: 2,
+        rulebook: { tone: "", bannedWords: [], exemplars: ["a", "b"] }
+      })
+    );
     const result = await importBrandVoice("csv", "a\nb");
     expect(result.added).toBe(2);
     const [, init] = fetchSpy.mock.calls[0];

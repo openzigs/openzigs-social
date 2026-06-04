@@ -81,7 +81,7 @@ describe("model router", () => {
       expect(body.ollama.installedVariant).toBe("gemma4:e4b");
       expect(body.ollama.recommendedVariant).toBe("gemma4:e4b");
       expect(body.ollama.models).toEqual(["gemma4:e4b", "llama3:8b"]);
-      expect(body.ollama.variants).toEqual(["gemma4:e8b", "gemma4:e4b", "gemma4:e2b"]);
+      expect(body.ollama.variants).toEqual(["gemma4:12b", "gemma4:e4b", "gemma4:e2b"]);
       expect(body.source).toBe("local");
       expect(body.providers.map((p: any) => p.id)).toEqual([
         "openai",
@@ -133,15 +133,15 @@ describe("model router", () => {
       const res = await fetch(`${base}/api/model/select`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ provider: "local", model: "gemma4:e8b" })
+        body: JSON.stringify({ provider: "local", model: "gemma4:12b" })
       });
       expect(res.status).toBe(200);
       const body = (await res.json()) as Record<string, any>;
       expect(body).toEqual({
         selected: true,
-        selection: { provider: "local", model: "gemma4:e8b" }
+        selection: { provider: "local", model: "gemma4:12b" }
       });
-      expect(await selection.get()).toEqual({ provider: "local", model: "gemma4:e8b" });
+      expect(await selection.get()).toEqual({ provider: "local", model: "gemma4:12b" });
     });
 
     it("rejects a local selection without a model (400)", async () => {

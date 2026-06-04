@@ -28,7 +28,7 @@ function status(over: Partial<lib.ModelStatus> = {}): lib.ModelStatus {
       baseUrl: "http://localhost:11434",
       installedVariant: null,
       recommendedVariant: "gemma4:e4b",
-      variants: ["gemma4:e8b", "gemma4:e4b", "gemma4:e2b"],
+      variants: ["gemma4:12b", "gemma4:e4b", "gemma4:e2b"],
       models: []
     },
     providers: [

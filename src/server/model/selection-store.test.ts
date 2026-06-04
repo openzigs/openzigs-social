@@ -34,9 +34,9 @@ describe("ModelSelectionStore", () => {
   it("trims the model and drops empty/whitespace model fields", async () => {
     const store = new ModelSelectionStore({ filePath });
     expect(await store.set({ provider: "openai", model: "   " })).toEqual({ provider: "openai" });
-    expect(await store.set({ provider: "local", model: "  gemma4:e8b  " })).toEqual({
+    expect(await store.set({ provider: "local", model: "  gemma4:12b  " })).toEqual({
       provider: "local",
-      model: "gemma4:e8b"
+      model: "gemma4:12b"
     });
   });
 

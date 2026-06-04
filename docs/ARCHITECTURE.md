@@ -252,9 +252,9 @@ which composes four collaborators:
 ### Ollama / Gemma 4 default
 
 `createOllamaProvider()` defaults to Gemma 4. `pickGemma4Variant(totalmem)`
-picks by host RAM (`e2b` < 8 GiB, `e4b` 8–16 GiB, `e8b` ≥ 16 GiB).
+picks by host RAM (`e2b` < 8 GiB, `e4b` 8–16 GiB, `12b` ≥ 16 GiB).
 `probeOllama()` hits `/api/tags` and `pickInstalledGemma4()` prefers the
-largest installed variant (`e8b` > `e4b` > `e2b`).
+largest installed variant (`12b` > `e4b` > `e2b`).
 
 ### Copilot SDK v0.2 → v0.3 migration (issue #130)
 

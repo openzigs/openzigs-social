@@ -11,7 +11,7 @@ import { OnboardingPage } from "./pages/onboarding.page";
 
 // ─────────────────────────────── fixtures ──────────────────────────────
 
-const GEMMA_VARIANTS = ["gemma4:e8b", "gemma4:e4b", "gemma4:e2b"];
+const GEMMA_VARIANTS = ["gemma4:12b", "gemma4:e4b", "gemma4:e2b"];
 
 function reachableModel(): ModelStatus {
   return {
@@ -160,15 +160,15 @@ test.describe("Model panel (#102)", () => {
     await onboarding.stubModelStatus(reachableModel());
     await onboarding.stubModelPull({
       pulling: true,
-      model: "gemma4:e8b",
+      model: "gemma4:12b",
       status: "downloading"
     });
     await onboarding.goto();
 
-    await onboarding.modelVariantSelect().selectOption("gemma4:e8b");
-    await expect(onboarding.pullButton("gemma4:e8b")).toBeVisible();
+    await onboarding.modelVariantSelect().selectOption("gemma4:12b");
+    await expect(onboarding.pullButton("gemma4:12b")).toBeVisible();
 
-    await onboarding.pullButton("gemma4:e8b").click();
+    await onboarding.pullButton("gemma4:12b").click();
     await expect(onboarding.page.getByText("Pulling model", { exact: true })).toBeVisible();
   });
 
