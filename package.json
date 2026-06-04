@@ -26,7 +26,7 @@
     "express-rate-limit": "^7.5.0",
     "grammy": "^1.40.0",
     "helmet": "^7.2.0",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.10",
     "socket.io": "^4.8.0",
     "winston": "^3.17.0",
