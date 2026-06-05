@@ -11,11 +11,19 @@
 5. UI map (`ui/`)
 6. Data model (SQLite)
 7. Copilot SDK runtime + smart router + privacy mode
-8. Platform connectors
-9. Approval queue + Telegram remote-control flow
-10. Brand voice + AI auto-reply pipeline
-11. Setup wizard
-12. Packaging (Tauri + docker-compose)
+12. Approval queue + handoff primitives (#128)
+    - 12.1 Telegram remote-control channel (#47)
+    - 12.2 Platform service layer (#127)
+    - 12.3 Cohort A connectors — Instagram / Facebook Pages / Threads (#53)
+    - 12.4 Cohort B connectors — LinkedIn / Pinterest / TikTok (#60)
+    - 12.5 Cohort C connector — X / Twitter v2 (#66)
+    - 12.6 Outbox + content calendar + scheduler (#84)
+    - 12.7 Brand voice + AI auto-reply pipeline (#78)
+    - 12.8 Light CRM — contacts, lead scoring, history, merging (#90)
+    - 12.9 Analytics dashboard + weekly digest (#95)
+    - 12.10 Onboarding polish — model, OAuth, Meta app, recipes, tour (#100)
+    - 12.11 GDPR right-to-delete (#138)
+    - 12.12 YouTube Data API v3 quota tracker (#58)
 13. Security model
 14. Observability (Winston + audit log)
 
