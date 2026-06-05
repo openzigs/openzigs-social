@@ -1,6 +1,6 @@
 {
   "name": "openzigs-social",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Focused, agentic, local-first social media manager.",
   "license": "MIT",
@@ -16,7 +16,9 @@
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.{ts,json,md}\"",
     "test": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "sbom": "cdxgen -o sbom.json",
+    "licenses": "license-checker --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;Python-2.0;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0' --excludePrivatePackages"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.3.0",
@@ -33,6 +35,7 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@cyclonedx/cdxgen": "^11.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^22.10.5",
@@ -42,6 +45,7 @@
     "@typescript-eslint/parser": "^8.20.0",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.18.0",
+    "license-checker": "^25.0.1",
     "prettier": "^3.4.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
