@@ -225,6 +225,56 @@ describe("backup router", () => {
 
     expect(res.status).toBe(400);
   });
+
+  it("POST /api/backup/import returns 413 when upload exceeds size limit", async () => {
+    // Mount a router with a tiny limit so we can test without sending real 100 MB
+    const smallLimitDb = openDb({ path: ":memory:" });
+    smallLimitDb.exec(`
+      CREATE TABLE IF NOT EXISTS backup_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        direction TEXT NOT NULL CHECK (direction IN ('export', 'import')),
+        created_at TEXT NOT NULL,
+        note TEXT
+      );
+    `);
+    const smallLimitRouter = createBackupRouter({
+      db: smallLimitDb,
+      dbFilePath: testDbPath,
+      vaultFilePath: testVaultPath,
+      scryptN: TEST_SCRYPT_N,
+      maxImportBytes: 512 // tiny limit for test
+    });
+    const smallLimitApp = createApp({
+      metrics: new Metrics(),
+      checkReadiness: () => ({ db: true, config: true, vault: true }),
+      backupRouter: smallLimitRouter
+    });
+    const { server: smallServer, base: smallBase } = await listen(smallLimitApp);
+
+    try {
+      const boundary = "test-boundary-large";
+      // Build a body that exceeds the 512-byte limit
+      const bigFile = Buffer.alloc(1024, 0xab);
+      const body = buildMultipart(boundary, bigFile, "test-passphrase-1");
+
+      const res = await fetch(`${smallBase}/api/backup/import`, {
+        method: "POST",
+        headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+        body
+      });
+
+      expect(res.status).toBe(413);
+      const result = (await res.json()) as { error: string };
+      expect(result.error).toMatch(/too large/i);
+    } finally {
+      await new Promise<void>((resolve) =>
+        smallServer.close(() => {
+          smallLimitDb.close();
+          resolve();
+        })
+      );
+    }
+  });
 });
 
 /** Build a minimal multipart/form-data body Buffer for testing. */

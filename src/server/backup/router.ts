@@ -10,12 +10,8 @@ import type { Database } from "better-sqlite3";
 import { createBackup } from "../../vault/backup.js";
 import { restoreBackup, RestoreError } from "../../vault/restore.js";
 
-const limiter = rateLimit({
-  windowMs: 60_000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false
-});
+/** Hard cap on multipart import body to prevent OOM before scrypt runs. */
+const MAX_IMPORT_BYTES = 100 * 1024 * 1024; // 100 MB
 
 const ExportBodySchema = z.object({
   passphrase: z.string().min(8, "passphrase must be at least 8 characters")
@@ -27,49 +23,68 @@ export interface BackupRouterDeps {
   vaultFilePath?: string;
   /** Override scrypt N (for tests only — never set in production). */
   scryptN?: number;
+  /** Override max import body size in bytes (for tests only). Defaults to 100 MB. */
+  maxImportBytes?: number;
 }
 
 export function createBackupRouter(deps: BackupRouterDeps): Router {
   const router = express.Router();
-  router.use(limiter);
+  const importSizeLimit = deps.maxImportBytes ?? MAX_IMPORT_BYTES;
 
-  router.post("/export", express.json({ limit: "1kb" }), async (req: Request, res: Response) => {
-    const parsed = ExportBodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(422).json({ error: parsed.error.errors[0]?.message ?? "invalid request" });
-      return;
-    }
-    const { passphrase } = parsed.data;
-    try {
-      deps.db
-        .prepare("INSERT INTO backup_log (direction, created_at) VALUES (?, ?)")
-        .run("export", new Date().toISOString());
-    } catch {
-      /* non-fatal */
-    }
-    let bundle: Buffer;
-    try {
-      bundle = await createBackup({
-        passphrase,
-        dbFilePath: deps.dbFilePath,
-        vaultFilePath: deps.vaultFilePath,
-        scryptN: deps.scryptN
-      });
-    } catch {
-      res.status(500).json({ error: "backup creation failed" });
-      return;
-    }
-    const dateStr = new Date().toISOString().split("T")[0];
-    res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="openzigs-social-backup-${dateStr}.bin"`
-    );
-    res.setHeader("Content-Length", bundle.length);
-    res.status(200).end(bundle);
+  /**
+   * Tight limiter: scrypt(N=2^17) takes ~1–2 s CPU and ~128 MB RAM per call.
+   * 5 req/min prevents server saturation while remaining generous for legit use.
+   * Created per-router-instance so tests get isolated rate-limit stores.
+   */
+  const backupLimiter = rateLimit({
+    windowMs: 60_000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false
   });
 
-  router.post("/import", (req: Request, res: Response) => {
+  router.post(
+    "/export",
+    backupLimiter,
+    express.json({ limit: "1kb" }),
+    async (req: Request, res: Response) => {
+      const parsed = ExportBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(422).json({ error: parsed.error.errors[0]?.message ?? "invalid request" });
+        return;
+      }
+      const { passphrase } = parsed.data;
+      try {
+        deps.db
+          .prepare("INSERT INTO backup_log (direction, created_at) VALUES (?, ?)")
+          .run("export", new Date().toISOString());
+      } catch {
+        /* non-fatal */
+      }
+      let bundle: Buffer;
+      try {
+        bundle = await createBackup({
+          passphrase,
+          dbFilePath: deps.dbFilePath,
+          vaultFilePath: deps.vaultFilePath,
+          scryptN: deps.scryptN
+        });
+      } catch {
+        res.status(500).json({ error: "backup creation failed" });
+        return;
+      }
+      const dateStr = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="openzigs-social-backup-${dateStr}.bin"`
+      );
+      res.setHeader("Content-Length", bundle.length);
+      res.status(200).end(bundle);
+    }
+  );
+
+  router.post("/import", backupLimiter, (req: Request, res: Response) => {
     const contentType = req.headers["content-type"] ?? "";
     if (!contentType.includes("multipart/form-data")) {
       res.status(400).json({ error: "content-type must be multipart/form-data" });
@@ -82,10 +97,20 @@ export function createBackupRouter(deps: BackupRouterDeps): Router {
     }
     const boundary = boundaryMatch[1]!;
     let rawBody = Buffer.alloc(0);
+    let totalBytes = 0;
+    let aborted = false;
     req.on("data", (chunk: Buffer) => {
+      totalBytes += chunk.length;
+      if (totalBytes > importSizeLimit) {
+        aborted = true;
+        res.status(413).json({ error: "backup file too large (max 100 MB)" });
+        req.destroy();
+        return;
+      }
       rawBody = Buffer.concat([rawBody, chunk]);
     });
     req.on("end", async () => {
+      if (aborted) return;
       try {
         const { fileBuffer, passphrase } = parseMultipart(rawBody, boundary);
         if (!fileBuffer) {

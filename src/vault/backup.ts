@@ -12,7 +12,7 @@
  *
  * Security: passphrase is NEVER logged or stored. All crypto is node built-in.
  */
-import { createCipheriv, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createCipheriv, randomBytes, scryptSync } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
@@ -165,6 +165,3 @@ export interface BackupEnvelope {
   /** Base64-encoded raw vault bytes */
   vault: string;
 }
-
-/** Prevent the `timingSafeEqual` helper from being tree-shaken away. */
-export { timingSafeEqual };

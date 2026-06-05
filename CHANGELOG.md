@@ -52,4 +52,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Value-level secret scrubbing in Winston logging pipeline.
 - `uuid >=11.1.1` and `glob >=10.5.0` via pnpm overrides.
 
+[Unreleased]: https://github.com/openzigs/openzigs-social/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/openzigs/openzigs-social/releases/tag/v0.1.0

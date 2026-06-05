@@ -30,7 +30,7 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint
@@ -70,7 +70,7 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check licenses (root)
         run: pnpm licenses
@@ -92,7 +92,7 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Generate server SBOM
         run: npx @cyclonedx/cdxgen -o sbom.json
@@ -123,7 +123,7 @@ jobs:
       - name: Build server
         run: |
           corepack enable
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
           pnpm build
 
       - name: Set up QEMU (multi-arch)
