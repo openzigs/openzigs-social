@@ -53,6 +53,12 @@ export interface ScoredContact {
 /** Full contact detail: scored contact + conversation timeline. */
 export interface ContactDetail extends ScoredContact {
   timeline: TimelineMessage[];
+  /**
+   * Number of merge-audit rows where this contact was the survivor.
+   * Used by the delete dialog to conditionally show the cascade option.
+   * Defaults to 0 when absent (older API payloads).
+   */
+  mergeCount?: number;
 }
 
 /** A suggested merge: two identities sharing a normalised email. */

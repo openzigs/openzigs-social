@@ -51,25 +51,13 @@ export function ContactsView() {
     );
   };
 
-  const handleDelete = (id: number, cascade: boolean): void => {
-    deleteContactMutation.mutate(
-      { id, cascade },
-      {
-        onSuccess: (receipt) => {
-          toast({
-            title: "Contact deleted",
-            description: `Removed ${receipt.rowsDeleted.contacts} contact, ${receipt.rowsDeleted.social_messages} message(s), ${receipt.rowsDeleted.auto_reply_audit} audit row(s).`
-          });
-          if (selectedId === id) setSelectedId(null);
-        },
-        onError: (err: unknown) =>
-          toast({
-            title: "Delete failed",
-            description: err instanceof Error ? err.message : "Unknown error",
-            variant: "destructive"
-          })
-      }
-    );
+  const handleDelete = async (id: number, cascade: boolean): Promise<void> => {
+    const receipt = await deleteContactMutation.mutateAsync({ id, cascade });
+    toast({
+      title: "Contact deleted",
+      description: `Removed ${receipt.rowsDeleted.contacts} contact, ${receipt.rowsDeleted.social_messages} message(s), ${receipt.rowsDeleted.auto_reply_audit} audit row(s).`
+    });
+    if (selectedId === id) setSelectedId(null);
   };
 
   return (

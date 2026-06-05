@@ -53,3 +53,59 @@ export function getQuotaUsage(db: Database, day_utc?: string): number {
     .get(day) as { quota_units: number } | undefined;
   return row?.quota_units ?? 0;
 }
+
+/**
+ * Returns `true` when adding `cost` units to today's usage would exceed the
+ * daily quota ceiling. Use this as a pre-dispatch guard: if exhausted, enqueue
+ * the job for the next UTC day rather than failing.
+ */
+export function isQuotaExhausted(db: Database, cost: number, day_utc?: string): boolean {
+  return getQuotaUsage(db, day_utc) + cost > YOUTUBE_DAILY_QUOTA;
+}
+
+/**
+ * Interface for anything that can broadcast a plain-text notification (e.g.
+ * {@link TelegramChannel}).  Kept narrow so the quota module stays decoupled
+ * from the full Telegram implementation.
+ */
+export interface QuotaAlertNotifier {
+  notify(text: string): Promise<void>;
+}
+
+/**
+ * Send a one-time Telegram quota alert when usage reaches ≥ 80 % of the daily
+ * ceiling.  The alert fires at most once per UTC day — a `alert_sent` flag on
+ * the quota row is set after the first send and checked on every subsequent
+ * call so the notification is never duplicated.
+ *
+ * Safe to call after every {@link recordQuotaUsage}: if the threshold hasn't
+ * been crossed, or the alert was already sent today, this is a no-op.
+ *
+ * @param db        - Better-SQLite3 database instance.
+ * @param notifier  - Telegram notifier (or `null`/`undefined` when not configured).
+ * @param day_utc   - Override the UTC date string (tests only).
+ */
+export async function maybeSendQuotaAlert(
+  db: Database,
+  notifier: QuotaAlertNotifier | null | undefined,
+  day_utc?: string
+): Promise<void> {
+  if (!notifier) return;
+  const day = day_utc ?? utcDay();
+  const used = getQuotaUsage(db, day);
+  if (used / YOUTUBE_DAILY_QUOTA < 0.8) return;
+
+  // Check if alert was already sent today.
+  const row = db
+    .prepare(`SELECT alert_sent FROM youtube_quota_usage WHERE day_utc = ?`)
+    .get(day) as { alert_sent: number } | undefined;
+  if (row?.alert_sent) return;
+
+  const pct = Math.round((used / YOUTUBE_DAILY_QUOTA) * 100);
+  await notifier.notify(
+    `⚠️ YouTube quota alert: ${used}/${YOUTUBE_DAILY_QUOTA} units used today (${pct}%). Approaching daily limit.`
+  );
+
+  // Mark alert sent (the row must exist — recordQuotaUsage creates it first).
+  db.prepare(`UPDATE youtube_quota_usage SET alert_sent = 1 WHERE day_utc = ?`).run(day);
+}

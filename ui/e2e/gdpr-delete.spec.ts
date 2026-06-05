@@ -3,18 +3,6 @@
  *
  * All network calls are intercepted with `page.route()` so the suite runs
  * offline and deterministically in CI.
- *
- * Untestable acceptance criteria (UI not yet implemented):
- *   • "If contact has no merged contacts: only 'Delete this contact only' is shown"
- *     → The dialog always shows a single "Delete contact" button; the cascade
- *       toggle described in the issue has not been surfaced in the UI component.
- *   • "If contact has merged contacts: both cascade options are shown and selectable"
- *     → Same reason; cascade is hard-coded to `false` in ContactDetailView.
- *   • "Confirming 'Delete and cascade' calls DELETE …?cascade=true"
- *     → Same reason.
- *   • "Dialog stays open on API error"
- *     → The component closes the dialog before calling the API (optimistic UX),
- *       so the error surfaces as a toast notification, not inside the dialog.
  */
 
 import { expect, test } from "@playwright/test";
@@ -188,8 +176,9 @@ test.describe("GDPR right-to-delete (#138)", () => {
     await expect(page.getByText("Select a contact to see their profile")).toBeVisible();
   });
 
-  // AC: If the API returns 404, an error toast is shown.
-  test("API 404 shows a Delete failed toast", async ({ page }) => {
+  // AC: If the API returns an error, the dialog stays open and shows an inline
+  // error message. The user can retry or cancel from within the open dialog.
+  test("API error keeps dialog open with an inline error message (no toast)", async ({ page }) => {
     await contacts.stubScenario(buildState());
     await contacts.stubDeleteContact(1, {
       statusCode: 404,
@@ -201,10 +190,108 @@ test.describe("GDPR right-to-delete (#138)", () => {
     await expect(contacts.detailHeading("Grace Hopper")).toBeVisible();
 
     await contacts.deleteButton().click();
+    await expect(contacts.deleteDialog()).toBeVisible();
     await contacts.confirmDeleteButton().click();
 
-    await expect(page.getByText("Delete failed")).toBeVisible();
-    // No success toast must appear
+    // Dialog must remain open
+    await expect(contacts.deleteDialog()).toBeVisible();
+    // Inline error must be visible inside the dialog
+    await expect(contacts.deleteErrorMessage()).toBeVisible();
+    await expect(contacts.deleteErrorMessage()).toContainText(/contact not found/i);
+    // No success toast
     await expect(page.getByText("Contact deleted")).not.toBeVisible();
+  });
+
+  // AC: Dialog stays open on error; user can cancel to dismiss.
+  test("user can cancel the dialog after an error", async () => {
+    await contacts.stubScenario(buildState());
+    await contacts.stubDeleteContact(1, { statusCode: 500, error: "server error" });
+    await contacts.goto();
+
+    await contacts.contact("Grace Hopper", "Top").click();
+    await expect(contacts.detailHeading("Grace Hopper")).toBeVisible();
+
+    await contacts.deleteButton().click();
+    await contacts.confirmDeleteButton().click();
+
+    await expect(contacts.deleteErrorMessage()).toBeVisible();
+    await contacts.cancelDeleteButton().click();
+    await expect(contacts.deleteDialog()).not.toBeVisible();
+  });
+
+  // AC: If contact has no merge history (mergeCount=0), only the single
+  // "Delete contact" button appears — no cascade radio group.
+  test("contact without merge history shows no cascade radio buttons", async () => {
+    const state = buildState({
+      details: [detailContact({ mergeCount: 0 })]
+    });
+    await contacts.stubScenario(state);
+    await contacts.goto();
+
+    await contacts.contact("Grace Hopper", "Top").click();
+    await expect(contacts.detailHeading("Grace Hopper")).toBeVisible();
+    await contacts.deleteButton().click();
+
+    await expect(contacts.deleteDialog()).toBeVisible();
+    await expect(contacts.deleteScopesSingle()).not.toBeVisible();
+    await expect(contacts.deleteScopesCascade()).not.toBeVisible();
+  });
+
+  // AC: If contact HAS merge history (mergeCount > 0), both cascade radio
+  // buttons appear inside the dialog.
+  test("contact WITH merge history shows both cascade radio buttons", async () => {
+    const state = buildState({
+      details: [detailContact({ mergeCount: 2 })]
+    });
+    await contacts.stubScenario(state);
+    await contacts.goto();
+
+    await contacts.contact("Grace Hopper", "Top").click();
+    await expect(contacts.detailHeading("Grace Hopper")).toBeVisible();
+    await contacts.deleteButton().click();
+
+    await expect(contacts.deleteDialog()).toBeVisible();
+    await expect(contacts.deleteScopesSingle()).toBeVisible();
+    await expect(contacts.deleteScopesCascade()).toBeVisible();
+    await expect(contacts.page.getByText(/what to delete/i)).toBeVisible();
+  });
+
+  // AC: Selecting cascade=true and confirming calls DELETE …?cascade=true.
+  test("selecting cascade=true calls DELETE with cascade=true", async ({ page }) => {
+    const state = buildState({
+      details: [detailContact({ mergeCount: 1 })]
+    });
+    await contacts.stubScenario(state);
+    await contacts.stubDeleteContact(1, {
+      receipt: {
+        deletedAt: "2026-06-04T12:00:00Z",
+        contactId: "1",
+        rowsDeleted: {
+          contacts: 2,
+          social_messages: 8,
+          auto_reply_audit: 3,
+          platform_insights_raw: 4,
+          merged_contacts: 1
+        }
+      }
+    });
+    await contacts.goto();
+
+    await contacts.contact("Grace Hopper", "Top").click();
+    await expect(contacts.detailHeading("Grace Hopper")).toBeVisible();
+
+    const deleteRequest = page.waitForRequest(
+      (req) => req.method() === "DELETE" && /\/api\/contacts\/1/.test(req.url())
+    );
+
+    await contacts.deleteButton().click();
+    await expect(contacts.deleteScopesCascade()).toBeVisible();
+    await contacts.deleteScopesCascade().click();
+    await contacts.confirmDeleteButton().click();
+
+    const request = await deleteRequest;
+    expect(request.url()).toContain("cascade=true");
+
+    await expect(page.getByText("Contact deleted")).toBeVisible();
   });
 });

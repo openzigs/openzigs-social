@@ -13,7 +13,10 @@ import {
   READ_COST,
   WRITE_COST,
   getQuotaUsage,
-  recordQuotaUsage
+  isQuotaExhausted,
+  maybeSendQuotaAlert,
+  recordQuotaUsage,
+  type QuotaAlertNotifier
 } from "./quota.js";
 
 describe("YouTube quota constants", () => {
@@ -155,6 +158,116 @@ describe("quota overflow detection", () => {
     const used = getQuotaUsage(db, "2025-01-15");
     // exactly at limit — not over
     expect(used + READ_COST > YOUTUBE_DAILY_QUOTA).toBe(false);
+  });
+});
+
+describe("isQuotaExhausted", () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = openDb({ path: ":memory:" });
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("returns false when no usage has been recorded", () => {
+    expect(isQuotaExhausted(db, READ_COST, "2025-01-15")).toBe(false);
+  });
+
+  it("returns false when usage is well below the limit", () => {
+    recordQuotaUsage(db, 100, "2025-01-15");
+    expect(isQuotaExhausted(db, READ_COST, "2025-01-15")).toBe(false);
+  });
+
+  it("returns false when usage plus cost exactly equals the limit (not over)", () => {
+    recordQuotaUsage(db, YOUTUBE_DAILY_QUOTA - READ_COST, "2025-01-15");
+    expect(isQuotaExhausted(db, READ_COST, "2025-01-15")).toBe(false);
+  });
+
+  it("returns true when usage plus cost exceeds the limit by one unit", () => {
+    recordQuotaUsage(db, YOUTUBE_DAILY_QUOTA, "2025-01-15");
+    expect(isQuotaExhausted(db, READ_COST, "2025-01-15")).toBe(true);
+  });
+
+  it("returns true when daily quota is fully consumed and a write is attempted", () => {
+    recordQuotaUsage(db, YOUTUBE_DAILY_QUOTA - 1, "2025-01-15");
+    expect(isQuotaExhausted(db, WRITE_COST, "2025-01-15")).toBe(true);
+  });
+
+  it("defaults to today UTC when no day_utc is given", () => {
+    // No usage today → not exhausted for a read cost.
+    expect(isQuotaExhausted(db, READ_COST)).toBe(false);
+  });
+});
+
+describe("maybeSendQuotaAlert", () => {
+  let db: Database;
+  let notifier: QuotaAlertNotifier;
+  let notifySpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    db = openDb({ path: ":memory:" });
+    notifySpy = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    notifier = { notify: notifySpy };
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("does nothing when notifier is null", async () => {
+    recordQuotaUsage(db, 9_000, "2025-01-15");
+    await maybeSendQuotaAlert(db, null, "2025-01-15");
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when notifier is undefined", async () => {
+    recordQuotaUsage(db, 9_000, "2025-01-15");
+    await maybeSendQuotaAlert(db, undefined, "2025-01-15");
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("does not send alert when usage is below 80%", async () => {
+    recordQuotaUsage(db, 7_999, "2025-01-15"); // 79.99 %
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15");
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("sends alert when usage is exactly 80%", async () => {
+    recordQuotaUsage(db, 8_000, "2025-01-15"); // exactly 80 %
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15");
+    expect(notifySpy).toHaveBeenCalledOnce();
+  });
+
+  it("sends alert when usage exceeds 80%", async () => {
+    recordQuotaUsage(db, 9_500, "2025-01-15"); // 95 %
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15");
+    expect(notifySpy).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT send a second alert on the same day once the flag is set", async () => {
+    recordQuotaUsage(db, 8_500, "2025-01-15");
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15"); // first call → sends
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15"); // second call → noop
+    expect(notifySpy).toHaveBeenCalledOnce();
+  });
+
+  it("sends again on a different day (flags are per-day)", async () => {
+    recordQuotaUsage(db, 8_500, "2025-01-14");
+    recordQuotaUsage(db, 8_500, "2025-01-15");
+    await maybeSendQuotaAlert(db, notifier, "2025-01-14");
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15");
+    expect(notifySpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("includes the percentage in the notification message", async () => {
+    recordQuotaUsage(db, 8_000, "2025-01-15"); // 80 %
+    await maybeSendQuotaAlert(db, notifier, "2025-01-15");
+    const message = notifySpy.mock.calls[0]?.[0] as string;
+    expect(message).toContain("80%");
+    expect(message).toContain("8000/10000");
   });
 });
 

@@ -22,6 +22,7 @@ function makeContact(over: Partial<ContactDetail> = {}): ContactDetail {
       components: { engagement: 0.8, sentiment: 0.5, follower: 0.3 }
     },
     timeline: [],
+    mergeCount: 0,
     ...over
   };
 }
@@ -83,27 +84,37 @@ describe("ContactDetailView", () => {
     });
 
     it("renders delete button when onDelete is provided", () => {
-      render(<ContactDetailView contact={makeContact()} onDelete={vi.fn()} />);
+      render(
+        <ContactDetailView
+          contact={makeContact()}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
       expect(screen.getByTestId("delete-contact-btn")).toBeInTheDocument();
     });
 
     it("opens delete dialog on button click", async () => {
-      render(<ContactDetailView contact={makeContact()} onDelete={vi.fn()} />);
+      render(
+        <ContactDetailView
+          contact={makeContact()}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
       fireEvent.click(screen.getByTestId("delete-contact-btn"));
       await waitFor(() => expect(screen.getByText(/delete jane smith/i)).toBeInTheDocument());
     });
 
-    it("calls onDelete with contact id and cascade=false when confirmed", async () => {
-      const onDelete = vi.fn();
-      render(<ContactDetailView contact={makeContact()} onDelete={onDelete} />);
+    it("calls onDelete with contact id and cascade=false when confirmed (no merge history)", async () => {
+      const onDelete = vi.fn().mockResolvedValue(undefined);
+      render(<ContactDetailView contact={makeContact({ mergeCount: 0 })} onDelete={onDelete} />);
       fireEvent.click(screen.getByTestId("delete-contact-btn"));
       await waitFor(() => screen.getByTestId("delete-confirm"));
       fireEvent.click(screen.getByTestId("delete-confirm"));
-      expect(onDelete).toHaveBeenCalledWith(42, false);
+      await waitFor(() => expect(onDelete).toHaveBeenCalledWith(42, false));
     });
 
     it("does not call onDelete when cancelled", async () => {
-      const onDelete = vi.fn();
+      const onDelete = vi.fn().mockResolvedValue(undefined);
       render(<ContactDetailView contact={makeContact()} onDelete={onDelete} />);
       fireEvent.click(screen.getByTestId("delete-contact-btn"));
       await waitFor(() => screen.getByText(/delete contact/i));
@@ -112,8 +123,112 @@ describe("ContactDetailView", () => {
     });
 
     it("disables delete button when deleting=true", () => {
-      render(<ContactDetailView contact={makeContact()} onDelete={vi.fn()} deleting />);
+      render(
+        <ContactDetailView
+          contact={makeContact()}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+          deleting
+        />
+      );
       expect(screen.getByTestId("delete-contact-btn")).toBeDisabled();
+    });
+
+    it("does NOT show cascade radio group when mergeCount is 0", async () => {
+      render(
+        <ContactDetailView
+          contact={makeContact({ mergeCount: 0 })}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-confirm"));
+      expect(screen.queryByTestId("delete-scope-single")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("delete-scope-cascade")).not.toBeInTheDocument();
+    });
+
+    it("does NOT show cascade radio group when mergeCount is undefined", async () => {
+      render(
+        <ContactDetailView
+          contact={makeContact({ mergeCount: undefined })}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-confirm"));
+      expect(screen.queryByTestId("delete-scope-cascade")).not.toBeInTheDocument();
+    });
+
+    it("shows cascade radio group when mergeCount > 0", async () => {
+      render(
+        <ContactDetailView
+          contact={makeContact({ mergeCount: 2 })}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-scope-single"));
+      expect(screen.getByTestId("delete-scope-single")).toBeInTheDocument();
+      expect(screen.getByTestId("delete-scope-cascade")).toBeInTheDocument();
+      expect(screen.getByText(/what to delete/i)).toBeInTheDocument();
+    });
+
+    it("calls onDelete with cascade=false when 'Delete this contact only' is selected", async () => {
+      const onDelete = vi.fn().mockResolvedValue(undefined);
+      render(<ContactDetailView contact={makeContact({ mergeCount: 1 })} onDelete={onDelete} />);
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-scope-single"));
+      fireEvent.click(screen.getByTestId("delete-scope-single"));
+      fireEvent.click(screen.getByTestId("delete-confirm"));
+      await waitFor(() => expect(onDelete).toHaveBeenCalledWith(42, false));
+    });
+
+    it("calls onDelete with cascade=true when 'Delete and all merged' is selected", async () => {
+      const onDelete = vi.fn().mockResolvedValue(undefined);
+      render(<ContactDetailView contact={makeContact({ mergeCount: 1 })} onDelete={onDelete} />);
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-scope-cascade"));
+      fireEvent.click(screen.getByTestId("delete-scope-cascade"));
+      fireEvent.click(screen.getByTestId("delete-confirm"));
+      await waitFor(() => expect(onDelete).toHaveBeenCalledWith(42, true));
+    });
+
+    it("keeps dialog open and shows error message when onDelete rejects", async () => {
+      const onDelete = vi.fn().mockRejectedValue(new Error("contact not found"));
+      render(<ContactDetailView contact={makeContact()} onDelete={onDelete} />);
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-confirm"));
+      fireEvent.click(screen.getByTestId("delete-confirm"));
+      await waitFor(() => expect(screen.getByTestId("delete-error")).toBeInTheDocument());
+      expect(screen.getByTestId("delete-error")).toHaveTextContent(/contact not found/i);
+      // Dialog must still be visible
+      expect(screen.getByTestId("delete-confirm")).toBeInTheDocument();
+    });
+
+    it("clears error and closes dialog on successful retry after a previous error", async () => {
+      const onDelete = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("temporary error"))
+        .mockResolvedValueOnce(undefined);
+      render(<ContactDetailView contact={makeContact()} onDelete={onDelete} />);
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-confirm"));
+      // First attempt — error
+      fireEvent.click(screen.getByTestId("delete-confirm"));
+      await waitFor(() => screen.getByTestId("delete-error"));
+      // Second attempt — success
+      fireEvent.click(screen.getByTestId("delete-confirm"));
+      await waitFor(() => expect(screen.queryByTestId("delete-confirm")).not.toBeInTheDocument());
+    });
+
+    it("closes dialog on cancel even when an error is showing", async () => {
+      const onDelete = vi.fn().mockRejectedValue(new Error("fail"));
+      render(<ContactDetailView contact={makeContact()} onDelete={onDelete} />);
+      fireEvent.click(screen.getByTestId("delete-contact-btn"));
+      await waitFor(() => screen.getByTestId("delete-confirm"));
+      fireEvent.click(screen.getByTestId("delete-confirm"));
+      await waitFor(() => screen.getByTestId("delete-error"));
+      fireEvent.click(screen.getByText(/^cancel$/i));
+      await waitFor(() => expect(screen.queryByTestId("delete-confirm")).not.toBeInTheDocument());
     });
   });
 });

@@ -18,8 +18,9 @@ export interface ContactDetailViewProps {
   contact?: ContactDetail;
   loading?: boolean;
   error?: string;
-  /** Called when the user confirms a delete, passing the contact id and cascade flag. */
-  onDelete?: (id: number, cascade: boolean) => void;
+  /** Called when the user confirms a delete, passing the contact id and cascade flag.
+   *  Returns a Promise so the dialog can stay open on error and close on success. */
+  onDelete?: (id: number, cascade: boolean) => Promise<void>;
   deleting?: boolean;
 }
 
@@ -51,6 +52,21 @@ export function ContactDetailView({
   deleting
 }: ContactDetailViewProps) {
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [cascadeOption, setCascadeOption] = React.useState(false);
+
+  const hasMergeHistory = (contact?.mergeCount ?? 0) > 0;
+
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!onDelete || !contact) return;
+    setDeleteError(null);
+    try {
+      await onDelete(contact.id, cascadeOption);
+      setDeleteOpen(false);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed. Please try again.");
+    }
+  };
   if (loading) {
     return <p className="p-4 text-sm text-muted-foreground">Loading contact…</p>;
   }
@@ -87,7 +103,16 @@ export function ContactDetailView({
               {bucket.label} · {Math.round(contact.leadScore.score * 100)}
             </span>
             {onDelete && (
-              <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <Dialog
+                open={deleteOpen}
+                onOpenChange={(open) => {
+                  setDeleteOpen(open);
+                  if (!open) {
+                    setDeleteError(null);
+                    setCascadeOption(false);
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button
                     variant="destructive"
@@ -106,17 +131,58 @@ export function ContactDetailView({
                       and platform insights. This action cannot be undone.
                     </DialogDescription>
                   </DialogHeader>
+
+                  {hasMergeHistory && (
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="delete-scope-label"
+                      className="space-y-2"
+                    >
+                      <p id="delete-scope-label" className="text-sm font-medium">
+                        What to delete
+                      </p>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="delete-cascade"
+                          value="false"
+                          checked={!cascadeOption}
+                          onChange={() => setCascadeOption(false)}
+                          className="accent-primary"
+                          data-testid="delete-scope-single"
+                        />
+                        Delete this contact only
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="delete-cascade"
+                          value="true"
+                          checked={cascadeOption}
+                          onChange={() => setCascadeOption(true)}
+                          className="accent-primary"
+                          data-testid="delete-scope-cascade"
+                        />
+                        Delete contact and all merged contacts
+                      </label>
+                    </div>
+                  )}
+
+                  {deleteError && (
+                    <p role="alert" className="text-sm text-destructive" data-testid="delete-error">
+                      {deleteError}
+                    </p>
+                  )}
+
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setDeleteOpen(false)}>
                       Cancel
                     </Button>
                     <Button
                       variant="destructive"
-                      onClick={() => {
-                        setDeleteOpen(false);
-                        onDelete(contact.id, false);
-                      }}
+                      onClick={() => void handleConfirmDelete()}
                       data-testid="delete-confirm"
+                      disabled={deleting}
                     >
                       Delete contact
                     </Button>

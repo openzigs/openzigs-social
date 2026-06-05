@@ -232,6 +232,21 @@ export class ContactsPage {
     return this.page.getByRole("button", { name: "Delete contact" });
   }
 
+  /** "Delete this contact only" radio inside the cascade group. */
+  deleteScopesSingle(): Locator {
+    return this.page.getByTestId("delete-scope-single");
+  }
+
+  /** "Delete contact and all merged contacts" radio inside the cascade group. */
+  deleteScopesCascade(): Locator {
+    return this.page.getByTestId("delete-scope-cascade");
+  }
+
+  /** Inline error message shown inside the dialog on API failure. */
+  deleteErrorMessage(): Locator {
+    return this.page.getByTestId("delete-error");
+  }
+
   /**
    * Registers a DELETE /api/contacts/:id stub.  Must be called **after**
    * `stubScenario` so that it takes precedence (Playwright routes are LIFO).
