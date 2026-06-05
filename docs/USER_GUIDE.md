@@ -4,50 +4,115 @@
 
 ## Table of contents
 
-1. Install
-   - Desktop (Tauri) — macOS
-   - Desktop (Tauri) — Windows
-   - Self-host (docker-compose)
-2. First-run setup wizard
-   - Choose your LLM (local Ollama / BYOK / Copilot)
-   - Connect Telegram for remote control
-   - Connect platforms (Twitter/X, LinkedIn, Instagram, Facebook, YouTube, TikTok, Pinterest)
-   - Per-user Meta app walkthrough
-3. The unified inbox
-4. Compose + schedule (calendar view)
-5. AI auto-reply with brand voice
+1. [Install](#1-install)
+   - [Self-host (Node + pnpm) — primary path](#self-host-node--pnpm)
+   - [Desktop (Tauri) — coming in v1.1](#desktop-tauri)
+   - [Self-host (docker-compose) — coming in v1.1](#self-host-docker-compose)
+2. [First-run setup wizard](#2-first-run-setup-wizard)
+   - [Choose your LLM (local Ollama / BYOK)](#21-choose-your-ai-model)
+   - [Connect Telegram for remote control](#22-connect-telegram-for-remote-control)
+   - [Connect platforms](#23-connect-platforms)
+   - [Per-user Meta app walkthrough](#24-per-user-meta-app-walkthrough)
+3. The unified inbox (§7 below)
+4. Compose + schedule — calendar view (§4 below)
+5. AI auto-reply with brand voice (§8 below)
    - Brand-voice rulebook
    - Confidence threshold
    - Hybrid posture (auto vs queued)
-6. Light CRM (contacts, lead scoring, history)
-7. Analytics dashboard
-8. Approvals over Telegram
-9. Privacy mode
-10. Troubleshooting
+6. Light CRM (§8.5 below)
+   - [Delete contact (GDPR right-to-delete)](#delete-contact-gdpr-right-to-delete)
+7. Analytics dashboard (§9 below)
+8. Approvals over Telegram (§10 below)
+9. [Onboarding & guided setup](#95-onboarding--guided-setup) (§9.5 below)
+10. Privacy mode (§11 below)
+11. [Troubleshooting](#14-troubleshooting) (§14 below)
+
+---
+
+## 1. Install
+
+### Self-host (Node + pnpm)
+
+This is the recommended and only fully-shipped path in v1. You run the API server and the Next.js UI as two separate local processes.
+
+**Prerequisites:**
+- [Node.js 22+](https://nodejs.org/)
+- [pnpm 10+](https://pnpm.io/installation) (`npm install -g pnpm`)
+- [Ollama ≥ 0.30.5](https://ollama.com/download) — the default local LLM runtime (optional if using a BYOK cloud provider)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/openzigs/openzigs-social.git
+cd openzigs-social
+
+# 2. Install all dependencies (root workspace + UI)
+pnpm install
+
+# 3. Create a local config overlay (edit as needed — see §13)
+cp config/default.json config/local.json
+
+# 4. Start the API server on port 3000
+pnpm dev
+
+# 5. In a second terminal — start the Next.js UI on port 3001
+cd ui && pnpm dev
+```
+
+Open `http://localhost:3001` in your browser. The setup wizard at `/setup` walks you through connecting your AI provider and Telegram bot.
+
+**Production build** (compiled, no hot-reload):
+```bash
+pnpm build          # compile server TypeScript
+cd ui && pnpm build # build the Next.js app
+pnpm start          # start the compiled server
+```
+
+### Desktop (Tauri)
+
+A packaged macOS + Windows desktop app is planned for **v1.1** (tracked in epic #108). It will bundle the Node server as a Tauri sidecar so you get a single double-click install.
+
+### Self-host (docker-compose)
+
+A `docker-compose.yml` with a prebuilt image is planned for **v1.1** (tracked in epic #108).
+
+---
 
 ## 2. First-run setup wizard
 
-(Currently a minimal skeleton — epic #129. The polished, guided onboarding
-experience is tracked in #100.)
+Open `/setup` in the app. The wizard has three steps and remembers your progress if you refresh or close the tab.
 
-Open `/setup` in the app. The wizard has three steps and remembers your
-progress if you refresh or close the tab:
+### 2.1 Choose your AI model
 
-1. **Welcome** — a short intro. Click **Next** to begin.
-2. **AI provider** — pick **OpenAI**, **Anthropic**, or **OpenAI-compatible**,
-   then paste your BYOK API key (for OpenAI-compatible, also enter the base
-   URL). Click **Validate & save** — the local server checks the key against
-   the provider's `/models` endpoint and, on success, stores it encrypted in
-   the vault. Your key is never displayed again and never leaves your machine
-   beyond that one validation call.
-3. **Telegram** — create a bot with [@BotFather](https://t.me/BotFather), then
-   enter its **bot token** and your numeric **admin chat id**. Click **Verify &
-   save** — the server confirms the bot via `getMe` and sends a one-time test
-   message to your admin chat. If it arrives, you're connected.
+Pick **OpenAI**, **Anthropic**, or **OpenAI-compatible**, then paste your BYOK API key (for OpenAI-compatible, also enter the base URL). Click **Validate & save** — the local server checks the key against the provider's `/models` endpoint and, on success, stores it encrypted in the vault. Your key is never displayed again and never leaves your machine beyond that one validation call.
 
-Only your *progress* is stored in the browser — secrets are held server-side in
-the encrypted vault (see §10). Telegram here is a minimal connection check; the
-full Telegram control surface is described in §8.
+For a fully local setup, install [Ollama ≥ 0.30.5](https://ollama.com/download), then run `ollama pull gemma4:e4b` (or let the onboarding wizard at `/onboarding` detect your RAM and pull the right variant — see §9.5).
+
+### 2.2 Connect Telegram for remote control
+
+Create a bot with [@BotFather](https://t.me/BotFather), then enter its **bot token** and your numeric **admin chat id**. Click **Verify & save** — the server confirms the bot via `getMe` and sends a one-time test message to your admin chat. If it arrives, you're connected.
+
+Full setup steps: [docs/TELEGRAM_SETUP.md](TELEGRAM_SETUP.md).
+
+### 2.3 Connect platforms
+
+Each social platform requires a BYOK developer app. Enable platforms in `config/local.json` and complete the OAuth flow via the **Onboarding** tab (`/onboarding` → **Connect platforms**). Full portal walkthroughs:
+
+| Platform | Guide | Notes |
+|---|---|---|
+| Twitter / X | [docs/oauth/twitter-x.md](oauth/twitter-x.md) | OAuth 2.0 PKCE; monthly write quota |
+| Instagram | [docs/oauth/instagram.md](oauth/instagram.md) | Meta developer app; Business/Creator account |
+| Facebook Pages | [docs/oauth/facebook.md](oauth/facebook.md) | Same Meta app as Instagram |
+| Threads | [docs/oauth/threads.md](oauth/threads.md) | Same Meta app; separate scope set |
+| LinkedIn | [docs/oauth/linkedin.md](oauth/linkedin.md) | Post + comments; no DMs in v1 |
+| YouTube | [docs/oauth/youtube.md](oauth/youtube.md) | Google Cloud project; 10,000 unit/day quota |
+| Pinterest | [docs/oauth/pinterest.md](oauth/pinterest.md) | Pinterest developer portal |
+| TikTok | [docs/oauth/tiktok.md](oauth/tiktok.md) | Posts private until audit approved |
+
+### 2.4 Per-user Meta app walkthrough
+
+The **Onboarding** tab (`/onboarding` → **Meta app**) provides a numbered, screenshot-backed walkthrough for creating your own Meta developer app so Instagram, Facebook, and Threads use your rate limits. Paste your **App ID** and **App Secret** — the secret is stored securely and never shown again — and the wizard returns the exact scopes and redirect URIs to register in the Meta developer console. See [docs/oauth/instagram.md](oauth/instagram.md) for the full portal walkthrough.
+
+Only your *progress* is stored in the browser — secrets are held server-side in the encrypted vault (see §12). The full Telegram control surface is described in §10.
 
 ## 4. Connecting Meta accounts + composing
 
@@ -322,6 +387,38 @@ Click **Merge** to fold them into one identity. The merge:
 Merges happen instantly and the list updates live. The first contact in a
 suggested pair becomes the surviving identity; the other is folded into it.
 
+### Delete contact (GDPR right-to-delete)
+
+You can permanently delete a contact and all their associated data to comply with
+GDPR Article 17 or a right-to-erasure request.
+
+**How to delete:**
+1. Open the contact's detail pane on `/contacts`.
+2. Click the **Delete** button at the bottom of the detail pane.
+3. A confirmation dialog shows the contact's name and a permanent-deletion warning.
+4. If the contact has merge history (was once merged into or from another contact)
+   you must also tick **Also delete merge history** — this enables the `cascade=true`
+   flag on the API call.
+5. Click **Delete permanently** to confirm.
+
+**What is deleted in a single atomic transaction:**
+
+| Table | Data removed |
+|---|---|
+| `crm_contacts` | The CRM identity record |
+| `crm_contact_links` | Cascades automatically via foreign key |
+| `social_messages` | All inbound/outbound messages for linked accounts |
+| `auto_reply_audit` | All AI draft decisions associated with this contact |
+| `platform_insights_raw` | Raw metric snapshots attributed to this contact |
+| `crm_contact_merges` | Merge audit rows (only when `cascade=true`) |
+
+A **toast notification** shows per-table row counts from the `GdprDeleteReceipt`
+so you have a record of what was removed. The operation cannot be undone.
+
+**API:** `DELETE /api/contacts/:id?cascade=true|false` — returns `200` with the
+receipt, `404` if not found, or `409` when merge history exists and `cascade=false`
+(re-request with `cascade=true`).
+
 ## 9. Analytics dashboard
 
 The **Analytics** tab turns the metrics your connected platforms report into a
@@ -562,5 +659,39 @@ Your OAuth refresh token has hard-expired. Open the affected platform
 panel and walk through the re-auth flow; the vault entry is updated
 atomically on success.
 
+### YouTube quota exhausted — writes are being queued
 
-## 2–10. _To be written._
+YouTube allocates **10,000 units per day** per Google Cloud project, resetting at
+midnight Pacific time. When the daily limit is reached, openzigs-social queues
+write operations to the next UTC day rather than failing them — pending items
+appear in the outbox.
+
+**Check current usage:**
+- Open `/settings` → **YouTube quota** widget — shows today's used units as a
+  progress bar (amber at ≥ 60%, red at ≥ 80%).
+- Call `GET /api/youtube/quota` directly: `{ day_utc, used, limit: 10000, pct }`.
+
+When usage reaches 80% you receive a one-time Telegram alert. If you receive it,
+review upcoming scheduled posts and defer any non-urgent YouTube writes.
+
+**Cost reference:** reads (list/search) cost **1 unit**; writes (comment insert,
+video update) cost **50 units**. Minimise search API calls (up to 100 units each)
+and batch comment operations where possible.
+
+### X / Twitter: "monthly write cap reached"
+
+The month-to-date write counter has hit your tier's cap (Free: 1,500 / Basic:
+50,000 / Pro: 1,000,000). openzigs-social stops issuing writes (fails closed).
+Posts and DMs queued after the cap is reached will not be sent until the next
+calendar month UTC.
+
+Check usage on the **X write quota** panel on `/settings`. To continue posting
+before the month resets, upgrade your X API tier and update `tier` in your config.
+
+### TikTok posts are private
+
+TikTok forces all posts to PRIVATE (`SELF_ONLY`) until your developer app passes
+TikTok's content-posting audit. This is a TikTok API restriction — not a
+configuration issue. Check your app's audit status in the TikTok developer
+portal. See [docs/oauth/tiktok.md](oauth/tiktok.md) for the production approval
+path.
