@@ -104,6 +104,8 @@ Layout under the data directory:
 | `platform/dm/` | `SocialDmSenderRegistry` (the #51 port) + rule-chain `DmDispatcher` (#144) |
 | `connectors/meta/` | Cohort A connectors: Instagram + Facebook Pages + Threads via Meta Graph API `v25.0`, built on the #127 ports (epic #53) |
 | `connectors/{linkedin,pinterest,tiktok}/` | Cohort B connectors: LinkedIn (no DM) + Pinterest + TikTok (PRIVATE-only), built on the #127 ports (epic #60) |
+| `connectors/youtube/quota.ts` | YouTube Data API v3 daily quota tracker: `recordQuotaUsage()`, `getQuotaUsage()`, `YOUTUBE_DAILY_QUOTA` / `READ_COST` / `WRITE_COST` constants, persisted in `youtube_quota_usage` (migration `0011`) (epic #58) |
+| `server/youtube/router.ts` | `GET /api/youtube/quota` — today's quota usage: `{day_utc, used, limit:10000, pct}` (epic #58) |
 | `connectors/twitter/` | Cohort C connector: X (Twitter) v2 with per-tier write-quota tracking + DM gated to paid tiers, built on the #127 ports (epic #66) |
 | `inbox/rules/` | Declarative comment **rule engine** — no-`eval` condition AST evaluator, repository, and append-only firing audit trail (epic #71, #74) |
 | `inbox/repository.ts` + `inbox/platform-limits.ts` | Unified thread/message read model (priority+recency sort, unread counts, FTS5 search) and per-platform reply limits (LinkedIn comments-only) (epic #71, #76/#77) |
@@ -116,7 +118,8 @@ Layout under the data directory:
 | `server/analytics/router.ts` | `/api/analytics/*` — `summary`, `engagement`, `heatmap`, `top-posts`; window/platform validated (422 on malformed), 60-req/min/IP limiter (epic #95) |
 | `crm/lead-score.ts` + `crm/email.ts` | **Light CRM** primitives — deterministic `scoreLead()` (engagement/sentiment/follower, no ML) + pure email/follower discovery helpers (epic #90, #92) |
 | `crm/repository.ts` | `CrmRepository` — cross-platform identity sync over SocialBrain, scored list/detail, unified timeline, suggested + transactional manual merge (epic #90, #91/#93/#94) |
-| `server/crm/router.ts` | `/api/contacts/*` — scored list, detail+timeline, suggested-merges, merge history, and `POST /merge` (emits `crm:merge`) (epic #90) |
+| `crm/gdpr.ts` | `deleteContact()` — single-transaction GDPR right-to-delete: purges `crm_contacts`, `social_messages`, `auto_reply_audit`, `platform_insights_raw`, and optionally `crm_contact_merges` in one atomic SQLite transaction; returns a `GdprDeleteReceipt` with per-table row counts (#138) |
+| `server/crm/router.ts` | `/api/contacts/*` — scored list, detail+timeline, suggested-merges, merge history, `POST /merge`, and `DELETE /:id` GDPR delete (emits `crm:merge`) (epic #90, #138) |
 
 ## 5. UI map (`ui/`)
 
@@ -210,6 +213,12 @@ SocialBrain store:
 | `crm_contacts` | Cross-platform CRM identity — `display_name`, normalized lowercase `email`, `follower_count`, timestamps; indexed by `email` |
 | `crm_contact_links` | One identity ↔ many `social_contacts` join, `UNIQUE (social_contact_id)` (a social contact maps to exactly one identity), **ON DELETE CASCADE** |
 | `crm_contact_merges` | **Append-only** merge audit — `survivor_id`, `source_id`, `mode` (`manual`/`suggested`), `created_at`; indexed by `survivor_id` |
+
+`0011-youtube-quota.sql` (epic #58) adds the YouTube quota ledger:
+
+| Table | Purpose |
+|---|---|
+| `youtube_quota_usage` | Daily YouTube Data API v3 quota totals — `day_utc` (`YYYY-MM-DD` UTC, UNIQUE), `quota_units`; upserts accumulate atomically with `ON CONFLICT DO UPDATE SET quota_units = quota_units + excluded.quota_units` |
 
 `0010-analytics.sql` (epic #95) adds the pre-computed analytics cache the
 dashboard reads from. Each table is keyed by `captured_for` (a `YYYY-MM-DD` day)

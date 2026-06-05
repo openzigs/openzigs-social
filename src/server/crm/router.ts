@@ -14,13 +14,19 @@
  */
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
+import type { Database } from "better-sqlite3";
 
 import { CrmRepository, MergeError } from "../../crm/index.js";
+import { deleteContact, GdprDeleteError } from "../../crm/gdpr.js";
 
 export interface ContactsRouterDeps {
   repo: CrmRepository;
+  /** SQLite database for GDPR delete operations. */
+  db: Database;
   /** Optional socket emit sink for live merge updates. */
   emit?: (event: string, payload: unknown) => void;
+  /** Injected logger for GDPR audit trail. */
+  logger?: { info: (msg: string, meta?: unknown) => void };
 }
 
 /** Parse a positive-integer route/query id, or `undefined` when invalid. */
@@ -135,6 +141,28 @@ export function createContactsRouter(deps: ContactsRouterDeps): Router {
       return;
     }
     res.status(200).json(envelope({ contact }));
+  });
+
+  // --- GDPR right-to-delete (#138) ----------------------------------------
+
+  router.delete("/:id", limiter, (req: Request, res: Response) => {
+    const id = parseId(req.params.id);
+    if (id === undefined) {
+      res.status(422).json({ error: "invalid contact id" });
+      return;
+    }
+    const cascadeMerges = req.query.cascade === "true";
+    try {
+      const receipt = deleteContact(deps.db, id, { cascadeMerges });
+      deps.logger?.info("crm.gdpr.delete", { contactId: id, cascadeMerges, receipt });
+      res.status(200).json(envelope({ receipt }));
+    } catch (err) {
+      if (err instanceof GdprDeleteError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
+      throw err;
+    }
   });
 
   return router;

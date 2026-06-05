@@ -50,6 +50,7 @@ import { AnalyticsAggregatorScheduler, WeeklyDigestScheduler } from "../analytic
 import { createMailer } from "../analytics/mailer.js";
 import { createContactsRouter } from "./crm/router.js";
 import { CrmRepository } from "../crm/index.js";
+import { createYouTubeRouter } from "./youtube/router.js";
 import { createModelRouter } from "./model/router.js";
 import { ModelSelectionStore } from "./model/selection-store.js";
 import { createSocialSetupRouter } from "./social-setup/router.js";
@@ -447,8 +448,16 @@ export async function startServer(): Promise<StartedServer> {
   const crmRepository = new CrmRepository(db, () => config.crm.leadScore);
   const contactsRouter = createContactsRouter({
     repo: crmRepository,
-    emit: (event, payload) => quotaSink.emit?.(event, payload)
+    db,
+    emit: (event, payload) => quotaSink.emit?.(event, payload),
+    logger: {
+      info: (msg, meta) => logger.info(msg, meta)
+    }
   });
+
+  // YouTube quota router (epic #58). Always mounted — the table is always
+  // present after migration 0011 even if no YouTube calls have been recorded.
+  const youtubeRouter = createYouTubeRouter({ db });
 
   // Onboarding polish (epic #100). The model panel (#102) probes the local
   // Ollama runtime and persists the active model selection; the social-setup
@@ -480,7 +489,8 @@ export async function startServer(): Promise<StartedServer> {
     contactsRouter,
     modelRouter,
     socialSetupRouter,
-    onboardingRouter
+    onboardingRouter,
+    youtubeRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {

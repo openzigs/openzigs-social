@@ -36,3 +36,11 @@ export {
   type MergeRecord,
   type ListContactsOptions
 } from "./repository.js";
+
+export {
+  deleteContact,
+  GdprDeleteError,
+  type GdprDeleteReceipt,
+  type GdprDeleteRowCounts,
+  type DeleteContactOptions
+} from "./gdpr.js";

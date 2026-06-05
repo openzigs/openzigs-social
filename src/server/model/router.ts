@@ -140,7 +140,7 @@ export function createModelRouter(deps: ModelRouterDeps): Router {
         // usage #69). Their data sources are owned by separate epics; the panel
         // renders the slots and these flags advertise availability.
         widgets: {
-          youtubeQuota: { available: false },
+          youtubeQuota: { available: true },
           byokCredit: { available: providers.some((p) => p.configured) }
         }
       });

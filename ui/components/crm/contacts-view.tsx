@@ -5,7 +5,13 @@ import * as React from "react";
 import { useSocket } from "@/app/providers";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { useContact, useContacts, useMergeContacts, useSuggestedMerges } from "@/lib/crm";
+import {
+  useContact,
+  useContacts,
+  useDeleteContact,
+  useMergeContacts,
+  useSuggestedMerges
+} from "@/lib/crm";
 import { ContactDetailView } from "./contact-detail";
 import { ContactList } from "./contact-list";
 import { SuggestedMerges } from "./suggested-merges";
@@ -25,6 +31,7 @@ export function ContactsView() {
   const contactQuery = useContact(selectedId);
   const suggestionsQuery = useSuggestedMerges();
   const mergeContacts = useMergeContacts();
+  const deleteContactMutation = useDeleteContact();
 
   const handleMerge = (survivorId: number, sourceId: number): void => {
     mergeContacts.mutate(
@@ -37,6 +44,27 @@ export function ContactsView() {
         onError: (err: unknown) =>
           toast({
             title: "Merge failed",
+            description: err instanceof Error ? err.message : "Unknown error",
+            variant: "destructive"
+          })
+      }
+    );
+  };
+
+  const handleDelete = (id: number, cascade: boolean): void => {
+    deleteContactMutation.mutate(
+      { id, cascade },
+      {
+        onSuccess: (receipt) => {
+          toast({
+            title: "Contact deleted",
+            description: `Removed ${receipt.rowsDeleted.contacts} contact, ${receipt.rowsDeleted.social_messages} message(s), ${receipt.rowsDeleted.auto_reply_audit} audit row(s).`
+          });
+          if (selectedId === id) setSelectedId(null);
+        },
+        onError: (err: unknown) =>
+          toast({
+            title: "Delete failed",
             description: err instanceof Error ? err.message : "Unknown error",
             variant: "destructive"
           })
@@ -69,6 +97,8 @@ export function ContactsView() {
             contact={contactQuery.data}
             loading={selectedId !== null && contactQuery.isLoading}
             error={contactQuery.isError ? "Could not load contact." : undefined}
+            onDelete={handleDelete}
+            deleting={deleteContactMutation.isPending}
           />
         </Card>
       </div>

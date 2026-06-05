@@ -3,11 +3,24 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { bucketMetaFor, type ContactDetail } from "@/lib/crm";
 import { PlatformBadge } from "@/components/inbox/platform-badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export interface ContactDetailViewProps {
   contact?: ContactDetail;
   loading?: boolean;
   error?: string;
+  /** Called when the user confirms a delete, passing the contact id and cascade flag. */
+  onDelete?: (id: number, cascade: boolean) => void;
+  deleting?: boolean;
 }
 
 function formatTimestamp(value: string): string {
@@ -27,8 +40,17 @@ function contactName(contact: ContactDetail): string {
  * Contact detail (#93): identity header with lead score, the linked
  * platform-native accounts, and the unified conversation timeline aggregated
  * chronologically across every linked account.
+ *
+ * Also hosts the GDPR right-to-delete dialog (#138).
  */
-export function ContactDetailView({ contact, loading, error }: ContactDetailViewProps) {
+export function ContactDetailView({
+  contact,
+  loading,
+  error,
+  onDelete,
+  deleting
+}: ContactDetailViewProps) {
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   if (loading) {
     return <p className="p-4 text-sm text-muted-foreground">Loading contact…</p>;
   }
@@ -54,15 +76,55 @@ export function ContactDetailView({ contact, loading, error }: ContactDetailView
       <header className="border-b p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="truncate text-lg font-semibold">{contactName(contact)}</h2>
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium",
-              bucket.className
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                bucket.className
+              )}
+              data-testid="lead-bucket"
+            >
+              {bucket.label} · {Math.round(contact.leadScore.score * 100)}
+            </span>
+            {onDelete && (
+              <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleting}
+                    data-testid="delete-contact-btn"
+                  >
+                    Delete
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete {contactName(contact)}?</DialogTitle>
+                    <DialogDescription>
+                      This will permanently delete the contact, all their messages, audit records,
+                      and platform insights. This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setDeleteOpen(false);
+                        onDelete(contact.id, false);
+                      }}
+                      data-testid="delete-confirm"
+                    >
+                      Delete contact
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
-            data-testid="lead-bucket"
-          >
-            {bucket.label} · {Math.round(contact.leadScore.score * 100)}
-          </span>
+          </div>
         </div>
         {contact.email && <p className="mt-1 text-sm text-muted-foreground">{contact.email}</p>}
         <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
