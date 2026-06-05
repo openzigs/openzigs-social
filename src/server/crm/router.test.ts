@@ -9,6 +9,21 @@ import { createApp } from "../app.js";
 import { CrmRepository } from "../../crm/index.js";
 import { createContactsRouter } from "./router.js";
 
+// Helper: insert a CRM contact directly
+function insertCrmContact(db: Database, displayName: string): number {
+  return Number(
+    db.prepare(`INSERT INTO crm_contacts (display_name) VALUES (?)`).run(displayName)
+      .lastInsertRowid
+  );
+}
+
+// Helper: insert merge record
+function insertMergeRecord(db: Database, survivorId: number, sourceId: number): void {
+  db.prepare(
+    `INSERT INTO crm_contact_merges (survivor_id, source_id, mode) VALUES (?, ?, 'manual')`
+  ).run(survivorId, sourceId);
+}
+
 function listen(app: ReturnType<typeof createApp>): Promise<{ server: Server; base: string }> {
   return new Promise((resolve) => {
     const server = app.listen(0, "127.0.0.1", () => {
@@ -46,6 +61,7 @@ describe("contacts router", () => {
     emitted = [];
     const router = createContactsRouter({
       repo,
+      db,
       emit: (event, payload) => emitted.push({ event, payload })
     });
     const app = createApp({
@@ -140,5 +156,70 @@ describe("contacts router", () => {
       body: JSON.stringify({ survivorId: id, sourceId: id })
     });
     expect(res.status).toBe(409);
+  });
+
+  // -------------------------------------------------------------------------
+  // DELETE /api/contacts/:id — GDPR right-to-delete (#138)
+  // -------------------------------------------------------------------------
+
+  describe("DELETE /api/contacts/:id", () => {
+    it("returns 404 for a contact that does not exist", async () => {
+      const res = await fetch(`${base}/api/contacts/9999`, { method: "DELETE" });
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 422 for a non-numeric id", async () => {
+      const res = await fetch(`${base}/api/contacts/not-a-number`, { method: "DELETE" });
+      expect(res.status).toBe(422);
+    });
+
+    it("returns 200 with receipt when deleting a simple contact (cascade=false)", async () => {
+      insertSocialContact(db, "twitter", "t_del");
+      const list = await (await fetch(`${base}/api/contacts`)).json();
+      const id = list.contacts[0].id as number;
+
+      const res = await fetch(`${base}/api/contacts/${id}?cascade=false`, {
+        method: "DELETE"
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        receipt: { contactId: string; deletedAt: string; rowsDeleted: Record<string, number> };
+      };
+      expect(body.receipt.contactId).toBe(String(id));
+      expect(body.receipt.rowsDeleted.contacts).toBe(1);
+      expect(body.receipt.deletedAt).toMatch(/^\d{4}-/);
+    });
+
+    it("returns 409 when cascade=false but contact has merge history", async () => {
+      const crmId = insertCrmContact(db, "Merge survivor");
+      insertMergeRecord(db, crmId, 9999);
+
+      const res = await fetch(`${base}/api/contacts/${crmId}?cascade=false`, {
+        method: "DELETE"
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toMatch(/cascade/i);
+    });
+
+    it("returns 200 when cascade=true and contact has merge history", async () => {
+      const crmId = insertCrmContact(db, "Merge survivor");
+      insertMergeRecord(db, crmId, 9999);
+
+      const res = await fetch(`${base}/api/contacts/${crmId}?cascade=true`, {
+        method: "DELETE"
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        receipt: { rowsDeleted: { merged_contacts?: number } };
+      };
+      expect(body.receipt.rowsDeleted.merged_contacts).toBe(1);
+    });
+
+    it("defaults cascade to false when query param is absent", async () => {
+      const crmId = insertCrmContact(db, "No-merge contact");
+      const res = await fetch(`${base}/api/contacts/${crmId}`, { method: "DELETE" });
+      expect(res.status).toBe(200);
+    });
   });
 });

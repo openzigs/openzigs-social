@@ -108,6 +108,11 @@ export interface AppDeps {
    */
   onboardingRouter?: Router;
   /**
+   * Pre-built YouTube quota router (epic #58), mounted at `/api/youtube` when
+   * provided. Reads only the non-secret daily quota ledger.
+   */
+  youtubeRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -231,6 +236,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.onboardingRouter) {
     api.use("/onboarding", deps.onboardingRouter);
+  }
+  if (deps.youtubeRouter) {
+    api.use("/youtube", deps.youtubeRouter);
   }
   app.use("/api", api);
 

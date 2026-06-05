@@ -16,7 +16,8 @@ vi.mock("@/lib/crm", async () => {
     useContacts: vi.fn(),
     useContact: vi.fn(),
     useSuggestedMerges: vi.fn(),
-    useMergeContacts: vi.fn()
+    useMergeContacts: vi.fn(),
+    useDeleteContact: vi.fn()
   };
 });
 
@@ -24,6 +25,7 @@ const useContacts = vi.mocked(crmLib.useContacts);
 const useContact = vi.mocked(crmLib.useContact);
 const useSuggestedMerges = vi.mocked(crmLib.useSuggestedMerges);
 const useMergeContacts = vi.mocked(crmLib.useMergeContacts);
+const useDeleteContact = vi.mocked(crmLib.useDeleteContact);
 
 function scored(over: Partial<crmLib.ScoredContact> = {}): crmLib.ScoredContact {
   return {
@@ -68,6 +70,7 @@ describe("ContactsView", () => {
     useContact.mockReturnValue(detailResult(undefined));
     useSuggestedMerges.mockReturnValue(suggestionsResult([]));
     useMergeContacts.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useDeleteContact.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 
     render(<ContactsView />);
     expect(screen.getByRole("heading", { name: "Contacts" })).toBeInTheDocument();
@@ -100,6 +103,7 @@ describe("ContactsView", () => {
     );
     useSuggestedMerges.mockReturnValue(suggestionsResult([]));
     useMergeContacts.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useDeleteContact.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 
     render(<ContactsView />);
     fireEvent.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
@@ -125,6 +129,7 @@ describe("ContactsView", () => {
       suggestionsResult([{ email: "ada@studio.com", contacts: [survivor, source] }])
     );
     useMergeContacts.mockReturnValue({ mutate, isPending: false } as never);
+    useDeleteContact.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 
     render(<ContactsView />);
     expect(screen.getByTestId("suggested-merges")).toBeInTheDocument();
@@ -141,6 +146,7 @@ describe("ContactsView", () => {
     useContact.mockReturnValue(detailResult(undefined));
     useSuggestedMerges.mockReturnValue(suggestionsResult([]));
     useMergeContacts.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useDeleteContact.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 
     render(<ContactsView />);
     expect(screen.getByTestId("no-suggestions")).toBeInTheDocument();

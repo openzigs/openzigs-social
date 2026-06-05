@@ -68,6 +68,9 @@ export interface ScoredContact extends CrmContact {
 /** A full CRM contact detail: scored contact + conversation timeline. */
 export interface ContactDetail extends ScoredContact {
   timeline: TimelineMessage[];
+  /** Number of merge-audit rows where this contact was the survivor. Used by
+   *  the UI to decide whether to offer a cascade-delete option (AC3 #138). */
+  mergeCount: number;
 }
 
 /** A suggested merge: two identities sharing a normalised email. */
@@ -378,7 +381,10 @@ export class CrmRepository {
   getContactDetail(id: number): ContactDetail | undefined {
     const contact = this.getContact(id);
     if (!contact) return undefined;
-    return { ...this.enrich(contact), timeline: this.timeline(id) };
+    const mergeRow = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM crm_contact_merges WHERE survivor_id = ?`)
+      .get(id) as { n: number };
+    return { ...this.enrich(contact), timeline: this.timeline(id), mergeCount: mergeRow.n };
   }
 
   /**

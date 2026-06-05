@@ -142,9 +142,7 @@ test.describe("Contacts view (#90)", () => {
     await expect(contacts.contact("Ada Lovelace", "Top")).toBeVisible();
     await expect(contacts.contact("Ada Lovelace", "Top")).toContainText("30 eng / 7d");
     await expect(contacts.contact("Ada Lovelace (LinkedIn)", "High")).toBeVisible();
-    await expect(contacts.contact("Ada Lovelace (LinkedIn)", "High")).toContainText(
-      "6 eng / 7d"
-    );
+    await expect(contacts.contact("Ada Lovelace (LinkedIn)", "High")).toContainText("6 eng / 7d");
   });
 
   // AC2: Clicking a contact opens the detail view with a conversation-history timeline in chronological order (cross-platform).

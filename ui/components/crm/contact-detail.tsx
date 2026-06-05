@@ -3,11 +3,25 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { bucketMetaFor, type ContactDetail } from "@/lib/crm";
 import { PlatformBadge } from "@/components/inbox/platform-badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export interface ContactDetailViewProps {
   contact?: ContactDetail;
   loading?: boolean;
   error?: string;
+  /** Called when the user confirms a delete, passing the contact id and cascade flag.
+   *  Returns a Promise so the dialog can stay open on error and close on success. */
+  onDelete?: (id: number, cascade: boolean) => Promise<void>;
+  deleting?: boolean;
 }
 
 function formatTimestamp(value: string): string {
@@ -27,8 +41,32 @@ function contactName(contact: ContactDetail): string {
  * Contact detail (#93): identity header with lead score, the linked
  * platform-native accounts, and the unified conversation timeline aggregated
  * chronologically across every linked account.
+ *
+ * Also hosts the GDPR right-to-delete dialog (#138).
  */
-export function ContactDetailView({ contact, loading, error }: ContactDetailViewProps) {
+export function ContactDetailView({
+  contact,
+  loading,
+  error,
+  onDelete,
+  deleting
+}: ContactDetailViewProps) {
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [cascadeOption, setCascadeOption] = React.useState(false);
+
+  const hasMergeHistory = (contact?.mergeCount ?? 0) > 0;
+
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!onDelete || !contact) return;
+    setDeleteError(null);
+    try {
+      await onDelete(contact.id, cascadeOption);
+      setDeleteOpen(false);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed. Please try again.");
+    }
+  };
   if (loading) {
     return <p className="p-4 text-sm text-muted-foreground">Loading contact…</p>;
   }
@@ -54,15 +92,105 @@ export function ContactDetailView({ contact, loading, error }: ContactDetailView
       <header className="border-b p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="truncate text-lg font-semibold">{contactName(contact)}</h2>
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium",
-              bucket.className
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                bucket.className
+              )}
+              data-testid="lead-bucket"
+            >
+              {bucket.label} · {Math.round(contact.leadScore.score * 100)}
+            </span>
+            {onDelete && (
+              <Dialog
+                open={deleteOpen}
+                onOpenChange={(open) => {
+                  setDeleteOpen(open);
+                  if (!open) {
+                    setDeleteError(null);
+                    setCascadeOption(false);
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleting}
+                    data-testid="delete-contact-btn"
+                  >
+                    Delete
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete {contactName(contact)}?</DialogTitle>
+                    <DialogDescription>
+                      This will permanently delete the contact, all their messages, audit records,
+                      and platform insights. This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {hasMergeHistory && (
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="delete-scope-label"
+                      className="space-y-2"
+                    >
+                      <p id="delete-scope-label" className="text-sm font-medium">
+                        What to delete
+                      </p>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="delete-cascade"
+                          value="false"
+                          checked={!cascadeOption}
+                          onChange={() => setCascadeOption(false)}
+                          className="accent-primary"
+                          data-testid="delete-scope-single"
+                        />
+                        Delete this contact only
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="delete-cascade"
+                          value="true"
+                          checked={cascadeOption}
+                          onChange={() => setCascadeOption(true)}
+                          className="accent-primary"
+                          data-testid="delete-scope-cascade"
+                        />
+                        Delete contact and all merged contacts
+                      </label>
+                    </div>
+                  )}
+
+                  {deleteError && (
+                    <p role="alert" className="text-sm text-destructive" data-testid="delete-error">
+                      {deleteError}
+                    </p>
+                  )}
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => void handleConfirmDelete()}
+                      data-testid="delete-confirm"
+                      disabled={deleting}
+                    >
+                      Delete contact
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
-            data-testid="lead-bucket"
-          >
-            {bucket.label} · {Math.round(contact.leadScore.score * 100)}
-          </span>
+          </div>
         </div>
         {contact.email && <p className="mt-1 text-sm text-muted-foreground">{contact.email}</p>}
         <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">

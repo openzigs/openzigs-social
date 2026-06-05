@@ -1,6 +1,12 @@
 import type { Locator, Page, Route } from "@playwright/test";
 
-import type { ContactDetail, ScoredContact, SuggestedMerge, TimelineMessage } from "@/lib/crm";
+import type {
+  ContactDetail,
+  GdprDeleteReceipt,
+  ScoredContact,
+  SuggestedMerge,
+  TimelineMessage
+} from "@/lib/crm";
 
 export interface ContactsStubState {
   contacts: ScoredContact[];
@@ -197,5 +203,88 @@ export class ContactsPage {
         body: envelope({ contacts: nextState.contacts })
       })
     );
+  }
+
+  // ─────────────────────── GDPR delete (#138) ───────────────────────────
+
+  /** The "Delete" trigger button in the contact-detail header. */
+  deleteButton(): Locator {
+    return this.page.getByRole("button", { name: "Delete", exact: true });
+  }
+
+  /** The GDPR delete confirmation dialog. */
+  deleteDialog(): Locator {
+    return this.page.getByRole("dialog");
+  }
+
+  /** Dialog heading that includes the contact name. */
+  deleteDialogTitle(name: string): Locator {
+    return this.page.getByRole("heading", { name: `Delete ${name}?` });
+  }
+
+  /** "Cancel" button inside the delete dialog. */
+  cancelDeleteButton(): Locator {
+    return this.page.getByRole("button", { name: "Cancel" });
+  }
+
+  /** Confirm-delete button inside the dialog ("Delete contact"). */
+  confirmDeleteButton(): Locator {
+    return this.page.getByRole("button", { name: "Delete contact" });
+  }
+
+  /** "Delete this contact only" radio inside the cascade group. */
+  deleteScopesSingle(): Locator {
+    return this.page.getByTestId("delete-scope-single");
+  }
+
+  /** "Delete contact and all merged contacts" radio inside the cascade group. */
+  deleteScopesCascade(): Locator {
+    return this.page.getByTestId("delete-scope-cascade");
+  }
+
+  /** Inline error message shown inside the dialog on API failure. */
+  deleteErrorMessage(): Locator {
+    return this.page.getByTestId("delete-error");
+  }
+
+  /**
+   * Registers a DELETE /api/contacts/:id stub.  Must be called **after**
+   * `stubScenario` so that it takes precedence (Playwright routes are LIFO).
+   * Non-DELETE requests for the same URL fall back to the `stubScenario` handler.
+   */
+  async stubDeleteContact(
+    id: number,
+    opts: { receipt?: GdprDeleteReceipt; statusCode?: number; error?: string } = {}
+  ): Promise<void> {
+    await this.page.route(new RegExp(`/api/contacts/${id}(?:\\?.*)?$`), async (route: Route) => {
+      if (route.request().method() !== "DELETE") {
+        await route.fallback();
+        return;
+      }
+      const status = opts.statusCode ?? 200;
+      if (status >= 400) {
+        await route.fulfill({
+          status,
+          contentType: "application/json",
+          body: JSON.stringify({ error: opts.error ?? "contact not found" })
+        });
+        return;
+      }
+      const receipt: GdprDeleteReceipt = opts.receipt ?? {
+        deletedAt: new Date().toISOString(),
+        contactId: String(id),
+        rowsDeleted: {
+          contacts: 1,
+          social_messages: 5,
+          auto_reply_audit: 2,
+          platform_insights_raw: 3
+        }
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ receipt })
+      });
+    });
   }
 }

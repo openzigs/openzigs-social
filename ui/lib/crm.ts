@@ -53,6 +53,12 @@ export interface ScoredContact {
 /** Full contact detail: scored contact + conversation timeline. */
 export interface ContactDetail extends ScoredContact {
   timeline: TimelineMessage[];
+  /**
+   * Number of merge-audit rows where this contact was the survivor.
+   * Used by the delete dialog to conditionally show the cascade option.
+   * Defaults to 0 when absent (older API payloads).
+   */
+  mergeCount?: number;
 }
 
 /** A suggested merge: two identities sharing a normalised email. */
@@ -199,6 +205,52 @@ export function useMergeContacts() {
       sourceId: number;
       mode?: "manual" | "suggested";
     }) => mergeContacts(survivorId, sourceId, mode),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["crm"] });
+    }
+  });
+}
+
+/** Per-table row counts returned in a GDPR delete receipt. */
+export interface GdprDeleteRowCounts {
+  contacts: number;
+  social_messages: number;
+  auto_reply_audit: number;
+  platform_insights_raw: number;
+  merged_contacts?: number;
+}
+
+/** Receipt returned from a successful GDPR delete. */
+export interface GdprDeleteReceipt {
+  deletedAt: string;
+  contactId: string;
+  rowsDeleted: GdprDeleteRowCounts;
+}
+
+interface DeleteReceiptResponse {
+  receipt: GdprDeleteReceipt;
+}
+
+/**
+ * Delete a contact (GDPR right-to-delete, #138).
+ * @param cascade - When true, also purges merge-history audit rows.
+ */
+export async function deleteContact(id: number, cascade: boolean): Promise<GdprDeleteReceipt> {
+  const res = await fetch(`${API_URL}/api/contacts/${id}?cascade=${String(cascade)}`, {
+    method: "DELETE"
+  });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(detail.error ?? `delete failed (HTTP ${res.status})`);
+  }
+  return ((await res.json()) as DeleteReceiptResponse).receipt;
+}
+
+/** Mutation hook for GDPR contact deletion; invalidates the contact caches. */
+export function useDeleteContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cascade }: { id: number; cascade: boolean }) => deleteContact(id, cascade),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["crm"] });
     }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchModelStatus, pullModel, selectModel, type ModelStatus } from "@/lib/onboarding";
+import { YouTubeQuotaWidget } from "@/components/youtube/quota-widget";
 
 /**
  * Model panel (epic #100, sub #102). Surfaces the local Ollama probe, the
@@ -211,12 +212,15 @@ export function ModelPanel({ onComplete }: { onComplete?: () => void } = {}) {
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2">
-          <div
-            data-testid="widget-youtube"
-            className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground"
-          >
-            YouTube quota
-            <div>{widgets.youtubeQuota.available ? "Live" : "Coming soon"}</div>
+          <div data-testid="widget-youtube">
+            {widgets.youtubeQuota.available ? (
+              <YouTubeQuotaWidget />
+            ) : (
+              <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+                YouTube quota
+                <div>Coming soon</div>
+              </div>
+            )}
           </div>
           <div
             data-testid="widget-credit"
