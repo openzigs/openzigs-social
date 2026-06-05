@@ -23,7 +23,13 @@
 
 ## 1. Overview
 
-_To be written._
+openzigs-social is a **local-first, single-tenant** social media manager. "Local-first" means that every piece of user data — credentials, conversation history, AI drafts, analytics — lives on the operator's machine and is never sent to a remote service unless the operator explicitly configures a cloud AI provider. The default LLM is Gemma 4 running locally via Ollama; cloud providers are opt-in BYOK and can be disabled entirely with a single privacy-mode flag.
+
+**Process topology.** In v1 the entire backend runs as a single **Node 22 process**: an Express 5 API server, a Socket.IO realtime layer, a SQLite database (WAL mode via better-sqlite3), a Telegram bot (grammy), the outbox scheduler, the analytics cron, and the OAuth/webhook infrastructure — all composed in `src/server/index.ts` by `startServer()`. The Next.js 16.2 UI (`ui/`) runs as a separate process on port 3001 and communicates with the server exclusively over REST + Socket.IO. There is no shared in-process memory between the two: they are truly independent processes joined by the network boundary. This separation makes the UI replaceable and keeps the test surface for the server clean.
+
+**AI routing.** All LLM traffic flows through `CopilotWrapper` (`src/copilot/wrapper.ts`), which composes a smart router, a privacy controller, and a session manager. The smart router estimates prompt token count (`Math.ceil(chars / 4)`) and routes to the local Ollama provider when the estimate is ≤ the `cloudThresholdTokens` (default 4,096) or when the privacy controller forces local-only. The privacy controller has three modes: `off` (cloud allowed), `session` (current-process local-only), and `global` (persistent kill-switch that prevents cloud provider construction entirely). This layered design means you can run fully air-gapped with zero code changes — just set `OPENZIGS_SOCIAL_PRIVACY_MODE=global`.
+
+**Remote control via Telegram.** The only push-notification surface is a Telegram bot (`src/channels/telegram/`). It is opt-in, deny-by-default, and operates as a rendering layer on top of the shared `ApprovalQueue` primitive. Every action that needs human sign-off — an AI auto-reply draft, an outbox post, a DM relay — flows through the same approval queue regardless of whether the decision arrives via the Telegram bot, the web UI, or the API. This means Telegram is not a special code path; it is just one subscriber to a shared event bus.
 
 ## 2. Tech stack
 
@@ -219,6 +225,12 @@ SocialBrain store:
 | Table | Purpose |
 |---|---|
 | `youtube_quota_usage` | Daily YouTube Data API v3 quota totals — `day_utc` (`YYYY-MM-DD` UTC, UNIQUE), `quota_units`; upserts accumulate atomically with `ON CONFLICT DO UPDATE SET quota_units = quota_units + excluded.quota_units` |
+
+`0012-youtube-quota-alert.sql` (epic #58 follow-up) adds:
+
+| Column | Purpose |
+|---|---|
+| `youtube_quota_usage.alert_sent` | Per-day flag (0/1) ensuring the 80%-threshold Telegram alert fires exactly once per UTC day; added via `ALTER TABLE` |
 
 `0010-analytics.sql` (epic #95) adds the pre-computed analytics cache the
 dashboard reads from. Each table is keyed by `captured_for` (a `YYYY-MM-DD` day)
@@ -925,6 +937,114 @@ state (`ozs.onboarding.tour`) and one for step progress
 mounted at `/onboarding` (reachable from the top-nav), and `TourOverlay` renders
 the dismissible coach-marks on the inbox, scheduler (calendar), and brand-voice
 (settings) surfaces.
+
+## 12.11 GDPR right-to-delete (#138)
+
+The GDPR right-to-delete flow gives operators a single, auditable path to
+permanently purge a contact and all their cross-table data in response to a
+data-subject erasure request (GDPR Article 17).
+
+**Domain function.** `deleteContact(db, id, options)` (`src/crm/gdpr.ts`) runs
+in a **single SQLite transaction** that purges data in dependency order:
+
+1. Counts auto-reply audit rows (for the receipt) and deletes them.
+2. Counts and deletes platform insights (`platform_insights_raw`) attributed to
+   the contact's linked social accounts.
+3. Counts and deletes all social messages for the linked accounts.
+4. Optionally deletes merge audit rows (`crm_contact_merges`) when
+   `options.cascadeMerges: true`.
+5. Deletes the `crm_contacts` row — the `ON DELETE CASCADE` foreign key on
+   `crm_contact_links` cleans up the join table automatically.
+
+All counts are returned in a `GdprDeleteReceipt`:
+
+```ts
+interface GdprDeleteReceipt {
+  contactId: number;
+  deletedAt: string;      // ISO-8601 UTC
+  rows: {
+    autoReplyAudit: number;
+    platformInsightsRaw: number;
+    socialMessages: number;
+    crmContactMerges: number;
+    crmContacts: number;  // always 1
+  };
+}
+```
+
+**Guard.** When `cascadeMerges: false` and the contact has merge history (it was
+a survivor or source in at least one merge), `deleteContact` throws
+`DeleteContactError` with `code: "merge_history"`. The HTTP layer maps this to
+**409** so callers must re-request explicitly with `cascade=true`, making the
+cascade opt-in rather than silent.
+
+**HTTP.** `DELETE /api/contacts/:id?cascade=true|false`
+(`src/server/crm/router.ts`): `200` + receipt on success, `404` when not found,
+`409` when merge history blocks a non-cascade delete. The route shares the
+existing 60-req/min/IP limiter.
+
+**UI.** `ContactDetailView` (`ui/components/crm/contact-detail.tsx`) adds a
+**Delete** button that opens a confirmation dialog (`AlertDialog` from shadcn).
+The dialog shows the contact's name and a permanent-deletion warning. When the
+contact has merge history, a checkbox labelled "Also delete merge history"
+enables the `cascade=true` flag. On confirmation, the component calls
+`deleteContact(id, cascade)` from `ui/lib/crm.ts`, shows a toast with the
+per-table receipt counts, and navigates back to the contact list.
+
+## 12.12 YouTube Data API v3 quota tracker (#58)
+
+YouTube's Data API v3 meters every project against a shared **10,000-unit daily
+budget** that resets at midnight Pacific time. Read calls cost 1 unit; write
+calls (comment insert, video update) cost 50 units.
+
+**Persistence.** `migrations/0011-youtube-quota.sql` creates `youtube_quota_usage`
+— a day-keyed ledger with an atomic upsert pattern:
+
+```sql
+CREATE TABLE youtube_quota_usage (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  day_utc     TEXT NOT NULL,       -- 'YYYY-MM-DD' UTC date bucket
+  quota_units INTEGER NOT NULL DEFAULT 0,
+  alert_sent  INTEGER NOT NULL DEFAULT 0,  -- added by migration 0012
+  UNIQUE (day_utc)
+);
+```
+
+`migrations/0012-youtube-quota-alert.sql` adds the `alert_sent` column via
+`ALTER TABLE` so the once-per-day 80%-threshold Telegram alert is never sent
+more than once regardless of how many quota-recording calls happen in the same
+UTC day.
+
+**Domain helpers.** `src/connectors/youtube/quota.ts` exports:
+
+- `YOUTUBE_DAILY_QUOTA = 10000`, `READ_COST = 1`, `WRITE_COST = 50` — the
+  canonical constants used by all callers.
+- `recordQuotaUsage(db, units)` — atomically upserts today's UTC row:
+  `INSERT … ON CONFLICT DO UPDATE SET quota_units = quota_units + excluded.quota_units`.
+  Retries never double-count.
+- `getQuotaUsage(db, dayUtc?)` — returns `{ day_utc, used, limit, pct }` for the
+  requested day (default today UTC). Reading this never counts against the quota.
+
+**Enqueue-not-fail.** When a write operation would exceed the daily limit,
+callers must **not** fail the request; instead they should schedule the write to
+the next UTC day via the outbox scheduler. The quota tracker signals this via the
+`pct` field — callers check `pct >= 1.0` before dispatching.
+
+**Telegram alert at 80%.** The quota poller (wired in `startServer`) checks
+`alert_sent = 0 AND pct >= 0.8` after each `recordQuotaUsage` call. If the
+condition is true it fires a Telegram notification via the shared `TelegramChannel`
+and sets `alert_sent = 1` for that day row — so the alert fires exactly once per
+UTC day regardless of how many writes happen after.
+
+**HTTP.** `GET /api/youtube/quota` (`src/server/youtube/router.ts`, 60-req/min
+limiter) returns today's snapshot: `{ day_utc, used, limit: 10000, pct }`. It
+reads only non-secret aggregates from `youtube_quota_usage` — no token material.
+
+**UI.** `YouTubeQuotaWidget` (`ui/components/youtube/quota-widget.tsx`) renders
+an accessible `role="progressbar"` that turns amber at ≥ 60% and red at ≥ 80%.
+It is embedded on both the onboarding model panel and the settings page. The
+widget polls `GET /api/youtube/quota` on mount and subscribes to
+`youtube:quota:update` socket events so it refreshes live after each write.
 
 ## 13. Security model
 
