@@ -51,6 +51,7 @@ import { createMailer } from "../analytics/mailer.js";
 import { createContactsRouter } from "./crm/router.js";
 import { CrmRepository } from "../crm/index.js";
 import { createYouTubeRouter } from "./youtube/router.js";
+import { createBackupRouter } from "./backup/router.js";
 import { createModelRouter } from "./model/router.js";
 import { ModelSelectionStore } from "./model/selection-store.js";
 import { createSocialSetupRouter } from "./social-setup/router.js";
@@ -459,6 +460,9 @@ export async function startServer(): Promise<StartedServer> {
   // present after migration 0011 even if no YouTube calls have been recorded.
   const youtubeRouter = createYouTubeRouter({ db });
 
+  // Backup router (#147). Always mounted — provides encrypted export and import.
+  const backupRouter = createBackupRouter({ db });
+
   // Onboarding polish (epic #100). The model panel (#102) probes the local
   // Ollama runtime and persists the active model selection; the social-setup
   // router (#105/#106) drives per-platform OAuth + the Meta app wizard; the
@@ -490,7 +494,8 @@ export async function startServer(): Promise<StartedServer> {
     modelRouter,
     socialSetupRouter,
     onboardingRouter,
-    youtubeRouter
+    youtubeRouter,
+    backupRouter
   });
   const httpServer = createServer(app);
   const io = createSocketServer(httpServer, {

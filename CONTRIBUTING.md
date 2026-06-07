@@ -120,3 +120,34 @@ This populates `graphify-out/` (which is committed and refreshed by CI).
 - Default to small, composable functions over classes unless state requires a class.
 - Don't add backwards-compat shims, feature flags, or speculative abstractions — fix the call sites instead.
 - All SQL must use parameterized queries — no string concatenation.
+
+## Cutting a release
+
+> **Important:** Only maintainers with push access to `main` and the ability to
+> create tags should follow this process.
+
+### Prerequisites
+
+1. All PR checks are green on `main`.
+2. `CHANGELOG.md` has a `## [X.Y.Z] — YYYY-MM-DD` section for the version being released.
+3. `package.json` (root) and `ui/package.json` have the correct `"version"` value.
+
+### Steps
+
+```bash
+# 1. Ensure you are on main and it is up to date
+git checkout main && git pull --ff-only origin main
+
+# 2. Verify the quality gate passes locally
+pnpm lint && pnpm typecheck && pnpm test && cd ui && pnpm lint && npx next build && cd ..
+
+# 3. Create and push the annotated tag — this triggers the release workflow
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+
+Pushing the tag triggers `.github/workflows/release.yml` which:
+- Runs the full quality + coverage gate
+- Checks license compatibility (`pnpm licenses- Checks license compatibility (`pnpm licenses- Checks license compatibility (`pnpm licenses-Docker image to `ghcr.io/- Checks license compatibility (`pnpm licenses- Checks license compatibilitM fil- Checks license compatibility (`pnp
+
+### H### H### H### H#For### H### H### H### H#For### H### H##-p### H### H### H### H#For### H### H### H### H#For### H### H##-p### H### H### H### H#For# the tag steps above with the new version number.

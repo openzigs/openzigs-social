@@ -30,6 +30,15 @@ jobs:
         run: pnpm typecheck
       - name: Test
         run: pnpm test
+      - name: Coverage (must meet ≥80% threshold)
+        run: pnpm coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: coverage/
+          retention-days: 7
 
   ui:
     name: UI (lint + build)
@@ -48,6 +57,16 @@ jobs:
       - name: Lint UI
         working-directory: ui
         run: pnpm lint
+      - name: Coverage UI (must meet ≥80% threshold)
+        working-directory: ui
+        run: pnpm test:coverage
+      - name: Upload UI coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-coverage
+          path: ui/coverage/
+          retention-days: 7
       - name: Build UI
         working-directory: ui
         run: pnpm build

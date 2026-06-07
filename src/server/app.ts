@@ -113,6 +113,11 @@ export interface AppDeps {
    */
   youtubeRouter?: Router;
   /**
+   * Pre-built backup router (#147), mounted at `/api/backup` when provided.
+   * Handles encrypted export and import of the DB + vault bundle.
+   */
+  backupRouter?: Router;
+  /**
    * Allowed browser origin for CORS. The UI (Next.js dev server) runs on a
    * different port than the REST API, so the browser issues cross-origin
    * requests that need an `Access-Control-Allow-Origin` header. Mirrors the
@@ -239,6 +244,9 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.youtubeRouter) {
     api.use("/youtube", deps.youtubeRouter);
+  }
+  if (deps.backupRouter) {
+    api.use("/backup", deps.backupRouter);
   }
   app.use("/api", api);
 

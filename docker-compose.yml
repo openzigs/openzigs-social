@@ -1,0 +1,27 @@
+# openzigs-social — docker-compose for self-hosted deployment
+# Usage: docker-compose up -d
+#
+# Data is persisted in ~/.openzigs-social on the host.
+# Configure by editing ~/.openzigs-social/config/local.json (created on first run).
+
+services:
+  api:
+    image: ghcr.io/openzigs/openzigs-social:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - "~/.openzigs-social:/root/.openzigs-social"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ./ui
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:3000
+    depends_on:
+      - api
+    restart: unless-stopped
