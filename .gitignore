@@ -231,3 +231,12 @@ issues.json
 code_scanning_alerts.json
 dependabot_alerts.json
 eng.traineddata
+
+# Tauri desktop build artifacts (epic #108)
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+# Compiled sidecar binaries (built by pnpm tauri:sidecar — not committed)
+src-tauri/binaries/server-*
+# Next.js static export for Tauri (built by TAURI_BUILD=1 pnpm build)
+ui/out/

@@ -18,7 +18,12 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "sbom": "cdxgen -o sbom.json",
-    "licenses": "license-checker --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;Python-2.0;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0' --excludePrivatePackages"
+    "licenses": "license-checker --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;Python-2.0;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0' --excludePrivatePackages",
+    "tauri:dev": "npx @tauri-apps/cli dev",
+    "tauri:build": "pnpm tauri:prep && pnpm tauri:sidecar && npx @tauri-apps/cli build",
+    "tauri:prep": "pnpm build && cd ui && TAURI_BUILD=1 pnpm build",
+    "tauri:sidecar": "node scripts/build-sidecar.mjs",
+    "tauri:icons": "npx @tauri-apps/cli icon docs/app-icon.png"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.3.0",
@@ -44,6 +49,7 @@
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "@vitest/coverage-v8": "^2.1.9",
+    "concurrently": "^10.0.3",
     "eslint": "^9.18.0",
     "license-checker": "^25.0.1",
     "prettier": "^3.4.2",

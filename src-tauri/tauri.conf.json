@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "openzigs social",
+  "identifier": "social.openzigs.app",
+  "version": "0.1.0",
+  "build": {
+    "beforeDevCommand": "concurrently --kill-others-on-fail \"pnpm dev\" \"cd ui && pnpm dev\"",
+    "devUrl": "http://localhost:3001",
+    "beforeBuildCommand": "pnpm build && cd ui && TAURI_BUILD=1 pnpm build",
+    "frontendDist": "../ui/out"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "openzigs social",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri: https://tauri.localhost; connect-src 'self' http://127.0.0.1:3000 ws://127.0.0.1:3000 http://localhost:3000 ws://localhost:3000 https://tauri.localhost; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/server"
+    ],
+    "resources": {
+      "binaries/server*": "binaries/"
+    },
+    "macOS": {
+      "entitlements": null,
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "minimumSystemVersion": "13.0"
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  }
+}
