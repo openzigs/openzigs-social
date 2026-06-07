@@ -56,8 +56,11 @@ export function EngagementChart({ points, loading }: EngagementChartProps) {
             No engagement recorded yet.
           </p>
         ) : (
-          <div className="h-72 w-full" data-testid="engagement-chart">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full" data-testid="engagement-chart">
+            {/* Explicit numeric height (matches the former h-72 / 18rem box) so
+                ResponsiveContainer always measures a positive box and never logs
+                the width(-1)/height(-1) first-paint warning (issue #168). */}
+            <ResponsiveContainer width="100%" height={288} minHeight={288}>
               <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="capturedFor" tick={{ fontSize: 12 }} />

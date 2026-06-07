@@ -219,6 +219,15 @@ of the #127 SocialBrain store:
 | `brand_voice_rulebook` | Single-row (`CHECK (id = 1)`) workspace voice config — `tone`, `banned_words_json`, `exemplars_json` — read by the profiler and edited from `/settings` |
 | `auto_reply_audit` | **Append-only** decision ledger — `thread_id`, `contact_id`, `platform`, `prompt`, `draft_text`, `final_text`, `confidence`, `voice_match`, `tone_match`, `banned_hits_json`, `decision` (`auto_send`/`queue`), `model`, `human_override`, `outcome` (`pending`/`sent`/`rejected`), timestamps. Indexed by `thread_id`, `created_at`, and `contact_id` (GDPR right-to-delete cascade, #138) |
 
+**Retention (#163).** `auto_reply_audit` is written for *every* decision — even
+when the Hybrid posture is disabled — so it would grow unbounded. A node-cron
+prune (`routing/retention-scheduler.ts`, default 03:20 daily) bounds it via the
+`autoReply.retention` config block: rows older than **`maxAgeDays` (default 90)**
+are deleted and the table is capped at the newest **`maxRows` (default 50000)**.
+Either bound set to `0` disables that half; `autoReply.retention.enabled: false`
+turns the prune off entirely. All four keys accept
+`OPENZIGS_SOCIAL_AUTO_REPLY_RETENTION_*` env overrides.
+
 `0009-crm.sql` (epic #90) adds the Light CRM identity layer over the #127
 SocialBrain store:
 

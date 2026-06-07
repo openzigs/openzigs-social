@@ -59,6 +59,18 @@ export interface AuditRecordInput {
   finalText?: string;
 }
 
+/**
+ * Retention bounds for {@link AutoReplyAuditRepository.prune}. Both bounds are
+ * optional and independent: an undefined / non-finite bound is skipped, so a
+ * caller can apply just an age window, just a row cap, or both.
+ */
+export interface AuditPruneInput {
+  /** Delete rows with `created_at` strictly older than this epoch-ms cutoff. */
+  olderThan?: number;
+  /** Keep at most this many newest rows; delete everything older beyond it. */
+  maxRows?: number;
+}
+
 /** Fields accepted when finalising an audit row's outcome. */
 export interface AuditFinalizeInput {
   outcome: AuditOutcome;
@@ -150,6 +162,8 @@ export class AutoReplyAuditRepository {
   private readonly getStmt: Statement;
   private readonly finalizeStmt: Statement;
   private readonly deleteByContactStmt: Statement;
+  private readonly pruneOlderStmt: Statement;
+  private readonly pruneCapStmt: Statement;
 
   constructor(db: Database, opts: AutoReplyAuditRepositoryOptions = {}) {
     this.db = db;
@@ -174,6 +188,18 @@ export class AutoReplyAuditRepository {
         WHERE id = @id`
     );
     this.deleteByContactStmt = db.prepare(`DELETE FROM auto_reply_audit WHERE contact_id = ?`);
+    this.pruneOlderStmt = db.prepare(`DELETE FROM auto_reply_audit WHERE created_at < @cutoff`);
+    // Keep the newest @cap rows (matching list()'s created_at DESC, id DESC
+    // ordering); delete everything outside that window. Parameterized so a
+    // forged cap can never widen the scan.
+    this.pruneCapStmt = db.prepare(
+      `DELETE FROM auto_reply_audit
+        WHERE id NOT IN (
+          SELECT id FROM auto_reply_audit
+           ORDER BY created_at DESC, id DESC
+           LIMIT @cap
+        )`
+    );
   }
 
   /** Record a new audit row and return it. */
@@ -246,6 +272,23 @@ export class AutoReplyAuditRepository {
   /** Delete every audit row owned by a contact (#138 right-to-delete cascade). */
   deleteByContact(contactId: string): number {
     return this.deleteByContactStmt.run(contactId).changes;
+  }
+
+  /**
+   * Apply the retention policy (#163): drop rows older than `olderThan` and/or
+   * cap the table at the newest `maxRows`. Returns the total rows deleted. Both
+   * bounds are clamped at this boundary — a non-finite or negative value is
+   * skipped rather than producing an unbounded or `LIMIT -1` delete.
+   */
+  prune(input: AuditPruneInput): number {
+    let deleted = 0;
+    if (input.olderThan !== undefined && Number.isFinite(input.olderThan)) {
+      deleted += this.pruneOlderStmt.run({ cutoff: input.olderThan }).changes;
+    }
+    if (input.maxRows !== undefined && Number.isFinite(input.maxRows) && input.maxRows >= 0) {
+      deleted += this.pruneCapStmt.run({ cap: Math.floor(input.maxRows) }).changes;
+    }
+    return deleted;
   }
 
   private getOrThrow(id: number): AutoReplyAudit {

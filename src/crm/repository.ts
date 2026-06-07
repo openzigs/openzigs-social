@@ -181,6 +181,9 @@ export class CrmRepository {
     listContacts: Statement;
     updateContact: Statement;
     deleteContact: Statement;
+    batchLinks: Statement;
+    batchEngagement: Statement;
+    batchRecentBodies: Statement;
     getLink: Statement;
     insertLink: Statement;
     repointLinks: Statement;
@@ -218,6 +221,43 @@ export class CrmRepository {
          WHERE id = @id`
       ),
       deleteContact: db.prepare(`DELETE FROM crm_contacts WHERE id = ?`),
+      // --- Batched list aggregates (#165) -------------------------------------
+      // listContacts() used to call linkedAccounts() + engagementCount() +
+      // recentBodies() once *per contact* (a 3-query-per-row N+1). These three
+      // statements fetch the same aggregates for a whole page of contacts in one
+      // round-trip each. The contact id set is passed as a single bound JSON
+      // array and expanded with json_each — no dynamically-built SQL.
+      batchLinks: db.prepare(
+        `SELECT l.crm_contact_id AS crm_id, l.social_contact_id, c.platform,
+                c.platform_contact_id, c.handle, c.display_name, c.avatar_url
+         FROM crm_contact_links l
+         JOIN social_contacts c ON c.id = l.social_contact_id
+         WHERE l.crm_contact_id IN (SELECT value FROM json_each(@ids))
+         ORDER BY l.crm_contact_id ASC, l.social_contact_id ASC`
+      ),
+      batchEngagement: db.prepare(
+        `SELECT l.crm_contact_id AS crm_id, COUNT(*) AS n
+         FROM social_messages m
+         JOIN crm_contact_links l ON l.social_contact_id = m.contact_id
+         WHERE l.crm_contact_id IN (SELECT value FROM json_each(@ids))
+           AND julianday(COALESCE(m.sent_at, m.created_at)) >= julianday('now', @since)
+         GROUP BY l.crm_contact_id`
+      ),
+      batchRecentBodies: db.prepare(
+        `SELECT crm_id, body FROM (
+           SELECT l.crm_contact_id AS crm_id, m.body AS body,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY l.crm_contact_id
+                    ORDER BY COALESCE(m.sent_at, m.created_at) DESC, m.id DESC
+                  ) AS rn
+           FROM social_messages m
+           JOIN crm_contact_links l ON l.social_contact_id = m.contact_id
+           WHERE l.crm_contact_id IN (SELECT value FROM json_each(@ids))
+             AND julianday(COALESCE(m.sent_at, m.created_at)) >= julianday('now', @since)
+         )
+         WHERE rn <= @limit
+         ORDER BY crm_id ASC, rn ASC`
+      ),
       getLink: db.prepare(
         `SELECT crm_contact_id AS id FROM crm_contact_links WHERE social_contact_id = ?`
       ),
@@ -368,13 +408,75 @@ export class CrmRepository {
   /**
    * List CRM identities (most-recently-updated first) with lead scores. Calls
    * {@link CrmRepository.sync} first so newly-ingested social contacts surface.
+   *
+   * The per-row aggregates (linked accounts, engagement count, lead-score
+   * inputs) are fetched in a fixed number of batched queries rather than
+   * O(n)-per-row (#165): the page's contact ids are passed once to three
+   * `json_each`-expanded statements and grouped in memory. Lead scores are
+   * computed by the same {@link scoreLead} call as the single-contact path, so
+   * results are identical.
    */
   listContacts(options: ListContactsOptions = {}): ScoredContact[] {
     this.sync();
     const limit = normalizeLimit(options.limit, 100);
     const offset = options.offset && options.offset > 0 ? Math.floor(options.offset) : 0;
     const rows = this.stmts.listContacts.all({ limit, offset }) as ContactRow[];
-    return rows.map((row) => this.enrich(toContact(row)));
+    if (rows.length === 0) return [];
+
+    const contacts = rows.map(toContact);
+    const ids = JSON.stringify(contacts.map((c) => c.id));
+    const since = windowModifier(this.weights().engagementWindowDays);
+
+    const linksByContact = new Map<number, LinkedAccount[]>();
+    for (const r of this.stmts.batchLinks.all({ ids }) as Array<LinkRow & { crm_id: number }>) {
+      const list = linksByContact.get(r.crm_id) ?? [];
+      list.push({
+        socialContactId: r.social_contact_id,
+        platform: r.platform,
+        platformContactId: r.platform_contact_id,
+        handle: r.handle ?? undefined,
+        displayName: r.display_name ?? undefined,
+        avatarUrl: r.avatar_url ?? undefined
+      });
+      linksByContact.set(r.crm_id, list);
+    }
+
+    const engagementByContact = new Map<number, number>();
+    for (const r of this.stmts.batchEngagement.all({ ids, since }) as Array<{
+      crm_id: number;
+      n: number;
+    }>) {
+      engagementByContact.set(r.crm_id, r.n);
+    }
+
+    const bodiesByContact = new Map<number, string[]>();
+    for (const r of this.stmts.batchRecentBodies.all({ ids, since, limit: 50 }) as Array<{
+      crm_id: number;
+      body: string;
+    }>) {
+      const list = bodiesByContact.get(r.crm_id) ?? [];
+      list.push(r.body);
+      bodiesByContact.set(r.crm_id, list);
+    }
+
+    const weights = this.weights();
+    return contacts.map((contact) => {
+      const engagementCount = engagementByContact.get(contact.id) ?? 0;
+      const leadScore = scoreLead(
+        {
+          engagementCount,
+          followerCount: contact.followerCount,
+          recentMessages: bodiesByContact.get(contact.id) ?? []
+        },
+        weights
+      );
+      return {
+        ...contact,
+        linkedAccounts: linksByContact.get(contact.id) ?? [],
+        engagementCount,
+        leadScore
+      };
+    });
   }
 
   /** Full detail (scored contact + timeline) for one identity. */

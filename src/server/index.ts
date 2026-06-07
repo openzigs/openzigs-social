@@ -58,6 +58,7 @@ import { createSocialSetupRouter } from "./social-setup/router.js";
 import { createOnboardingRouter } from "./onboarding/router.js";
 import { BrandVoiceRepository } from "../personality/rulebook-repository.js";
 import { AutoReplyAuditRepository } from "../routing/audit-repository.js";
+import { AutoReplyRetentionScheduler } from "../routing/retention-scheduler.js";
 import { AutoReplyPipeline } from "../routing/pipeline.js";
 import { buildOutboxDispatch } from "./outbox/publishers.js";
 import { OutboxPoller } from "../outbox/poller.js";
@@ -415,6 +416,19 @@ export async function startServer(): Promise<StartedServer> {
   // sender records the intent on the socket bus.
   const autoReplyRulebook = new BrandVoiceRepository(db);
   const autoReplyAudit = new AutoReplyAuditRepository(db);
+  // Retention prune for the append-only audit trail (#163). Runs independently
+  // of the Hybrid posture switch — the audit table is written even when
+  // auto-send is off, so it must be bounded regardless.
+  const autoReplyRetention = new AutoReplyRetentionScheduler({
+    audit: autoReplyAudit,
+    cronExpression: config.autoReply.retention.cron,
+    maxAgeDays: config.autoReply.retention.maxAgeDays,
+    maxRows: config.autoReply.retention.maxRows,
+    logger: {
+      info: (msg, meta) => logger.info(msg, meta),
+      error: (msg, meta) => logger.error(msg, meta)
+    }
+  });
   const autoReplyThresholds = () => ({
     confidenceThreshold: config.autoReply.confidenceThreshold,
     voiceThreshold: config.autoReply.voiceThreshold
@@ -522,6 +536,12 @@ export async function startServer(): Promise<StartedServer> {
     outboxScheduler.start();
   }
 
+  // Auto-reply audit retention prune (#163). Opt-out via config; bounded growth
+  // of the append-only audit trail.
+  if (config.autoReply.retention.enabled) {
+    autoReplyRetention.start();
+  }
+
   // Telegram remote-control channel (epic #47). Opt-in via config; never blocks
   // server start. The bot token + admin chat id come from the encrypted vault.
   let telegram: TelegramChannel | undefined;
@@ -590,6 +610,7 @@ export async function startServer(): Promise<StartedServer> {
     if (closed) return;
     closed = true;
     outboxScheduler.stop();
+    autoReplyRetention.stop();
     analyticsAggregator.stop();
     weeklyDigest.stop();
     if (telegram) await telegram.stop().catch(() => undefined);

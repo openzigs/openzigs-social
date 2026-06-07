@@ -6,8 +6,9 @@
  * goes out over Telegram alone — no transport is created, no connection is
  * attempted, nothing throws. Email is a bonus, not a hard dependency.
  *
- * The SMTP password (when auth is used) is passed in from the encrypted vault
- * by the caller; it is never read from plaintext config.
+ * The SMTP password (when auth is used) is passed in by the caller, sourced
+ * from the `OPENZIGS_SOCIAL_SMTP_PASSWORD` environment variable; it is never
+ * read from plaintext config nor persisted.
  */
 import nodemailer from "nodemailer";
 
@@ -32,7 +33,10 @@ export interface MailTransport {
 
 export interface CreateMailerDeps {
   settings: SmtpSettings;
-  /** SMTP auth password from the vault (omit for unauthenticated relays). */
+  /**
+   * SMTP auth password, sourced from the `OPENZIGS_SOCIAL_SMTP_PASSWORD` env
+   * var by the caller (omit for unauthenticated relays). Never persisted.
+   */
   password?: string;
   /** Injectable transport factory (tests pass a fake). */
   createTransport?: (opts: {

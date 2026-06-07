@@ -348,7 +348,38 @@ export const ConfigSchema = z
          * auto-send. Default 0.80. A banned-word hit vetoes the score to 0, so a
          * banned word always forces the draft into the approval queue.
          */
-        voiceThreshold: z.coerce.number().min(0).max(1).default(0.8)
+        voiceThreshold: z.coerce.number().min(0).max(1).default(0.8),
+        /**
+         * Retention / prune policy for the append-only `auto_reply_audit` table
+         * (#163). The audit trail is written for *every* decision even when the
+         * Hybrid posture is disabled, so the table grows unbounded without a
+         * prune path. A node-cron job deletes rows older than `maxAgeDays` and
+         * caps the table at `maxRows` (newest kept). Enabled by default; set
+         * either bound to 0 to disable that half of the policy.
+         */
+        retention: z
+          .object({
+            /** Master switch for the prune cron. Default on. */
+            enabled: booleanish.default(true),
+            /**
+             * Cron cadence for the prune pass. Default 03:20 daily (a quiet
+             * hour, offset off other crons). Validated by node-cron at startup.
+             */
+            cron: z.string().min(1).default("20 3 * * *"),
+            /**
+             * Delete audit rows older than this many days. Default 90. Set to 0
+             * to disable age-based pruning (keep rows of any age).
+             */
+            maxAgeDays: z.coerce.number().int().min(0).default(90),
+            /**
+             * Hard cap on retained rows — the newest `maxRows` survive, older
+             * rows beyond the cap are deleted. Default 50000. Set to 0 to
+             * disable the row-count cap.
+             */
+            maxRows: z.coerce.number().int().min(0).default(50000)
+          })
+          .strict()
+          .default({})
       })
       .strict()
       .default({}),
@@ -384,8 +415,8 @@ export const ConfigSchema = z
         /**
          * Optional SMTP delivery for the weekly digest. When `host`/`from`/`to`
          * are unset the digest is sent over Telegram only — email delivery is
-         * skipped gracefully, never a crash. The SMTP password (if any) lives
-         * in the encrypted vault (BYOK), never here.
+         * skipped gracefully, never a crash. The SMTP password (if any) is read
+         * from the `OPENZIGS_SOCIAL_SMTP_PASSWORD` env var, never here.
          */
         smtp: z
           .object({
@@ -394,7 +425,7 @@ export const ConfigSchema = z
             port: z.coerce.number().int().min(1).max(65535).default(587),
             /** Use implicit TLS (port 465). STARTTLS otherwise. */
             secure: booleanish.default(false),
-            /** SMTP auth username (the password is read from the vault). */
+            /** SMTP auth username (the password is read from the OPENZIGS_SOCIAL_SMTP_PASSWORD env var). */
             user: z.string().min(1).optional(),
             /** From address, e.g. `"OpenZigs <digest@example.com>"`. */
             from: z.string().min(1).optional(),

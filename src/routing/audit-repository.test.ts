@@ -129,4 +129,60 @@ describe("AutoReplyAuditRepository", () => {
   it("survives a fresh connection to the same file (WAL persistence)", () => {
     expect(repo.get(1)).toBeUndefined();
   });
+
+  describe("prune (#163 retention)", () => {
+    it("keeps rows within the age window and deletes rows outside it", () => {
+      clock = 1000;
+      repo.record(baseInput()); // old row at created_at = 1000
+      clock = 10_000;
+      repo.record(baseInput()); // newer row at created_at = 10000
+      const deleted = repo.prune({ olderThan: 5000 });
+      expect(deleted).toBe(1);
+      const remaining = repo.list();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].createdAt).toBe(10_000);
+    });
+
+    it("honours the row-count cap, keeping only the newest rows", () => {
+      for (let i = 0; i < 5; i++) {
+        clock = 1000 + i;
+        repo.record(baseInput());
+      }
+      const deleted = repo.prune({ maxRows: 2 });
+      expect(deleted).toBe(3);
+      const remaining = repo.list();
+      expect(remaining).toHaveLength(2);
+      // The two survivors are the most recently created rows.
+      expect(remaining.map((r) => r.createdAt)).toEqual([1004, 1003]);
+    });
+
+    it("applies both bounds in a single pass", () => {
+      clock = 1000;
+      repo.record(baseInput()); // dropped by age window
+      clock = 10_000;
+      repo.record(baseInput());
+      clock = 10_001;
+      repo.record(baseInput());
+      clock = 10_002;
+      repo.record(baseInput());
+      const deleted = repo.prune({ olderThan: 5000, maxRows: 2 });
+      // 1 dropped by age + 1 dropped by the cap (3 fresh, cap 2).
+      expect(deleted).toBe(2);
+      expect(repo.list()).toHaveLength(2);
+    });
+
+    it("skips non-finite / negative bounds rather than running an unbounded delete", () => {
+      for (let i = 0; i < 3; i++) repo.record(baseInput());
+      expect(repo.prune({ olderThan: Number.NaN })).toBe(0);
+      expect(repo.prune({ maxRows: -1 })).toBe(0);
+      expect(repo.prune({})).toBe(0);
+      expect(repo.list()).toHaveLength(3);
+    });
+
+    it("treats a zero cap as 'keep nothing'", () => {
+      for (let i = 0; i < 3; i++) repo.record(baseInput());
+      expect(repo.prune({ maxRows: 0 })).toBe(3);
+      expect(repo.list()).toHaveLength(0);
+    });
+  });
 });

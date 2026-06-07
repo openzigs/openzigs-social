@@ -303,4 +303,89 @@ describe("CrmRepository", () => {
       expect(repo.listContacts({ limit: 2 })).toHaveLength(2);
     });
   });
+
+  describe("listContacts query batching (#165)", () => {
+    it("issues a constant number of queries regardless of contact count", () => {
+      // A db whose prepared statements count their all/get/run executions, so we
+      // can assert the query count does not scale with the number of contacts.
+      const countingDb = openDb({ path: ":memory:" });
+      let execCount = 0;
+      const realPrepare = countingDb.prepare.bind(countingDb);
+      countingDb.prepare = ((sql: string) => {
+        const stmt = realPrepare(sql);
+        return new Proxy(stmt, {
+          get(target, prop, receiver) {
+            const value = Reflect.get(target, prop, receiver) as unknown;
+            if ((prop === "all" || prop === "get" || prop === "run") && typeof value === "function") {
+              return (...args: unknown[]) => {
+                execCount += 1;
+                return (value as (...a: unknown[]) => unknown).apply(target, args);
+              };
+            }
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+        });
+      }) as typeof countingDb.prepare;
+
+      const countingRepo = new CrmRepository(countingDb);
+
+      const seed = (n: number, start: number): void => {
+        for (let i = 0; i < n; i++) {
+          insertSocialContact(countingDb, {
+            platform: "twitter",
+            platformContactId: `t${start + i}`
+          });
+          // Each contact gets a couple of recent messages so the engagement +
+          // recent-body aggregates have rows to batch.
+          insertMessage(countingDb, {
+            platform: "twitter",
+            contactId: Number(
+              (
+                countingDb
+                  .prepare(`SELECT id FROM social_contacts ORDER BY id DESC LIMIT 1`)
+                  .get() as { id: number }
+              ).id
+            ),
+            body: `m${start + i}`,
+            sinceModifier: "-1 days"
+          });
+        }
+        countingRepo.sync();
+      };
+
+      seed(2, 0);
+      execCount = 0;
+      const smallResult = countingRepo.listContacts();
+      const smallQueries = execCount;
+      expect(smallResult).toHaveLength(2);
+
+      seed(8, 100); // 10 contacts total now
+      execCount = 0;
+      const largeResult = countingRepo.listContacts();
+      const largeQueries = execCount;
+      expect(largeResult).toHaveLength(10);
+
+      // The query count is constant (sync + list + 3 batch aggregates), not O(n).
+      expect(largeQueries).toBe(smallQueries);
+      expect(smallQueries).toBeLessThanOrEqual(6);
+
+      countingDb.close();
+    });
+
+    it("preserves linked accounts, engagement counts, and lead scores", () => {
+      const sc = insertSocialContact(db, {
+        platform: "twitter",
+        platformContactId: "t1",
+        metadata: { followers: 100 }
+      });
+      for (let i = 0; i < 3; i++) {
+        insertMessage(db, { platform: "twitter", contactId: sc, body: `hi ${i}`, sinceModifier: "-1 days" });
+      }
+      const [contact] = repo.listContacts();
+      expect(contact.linkedAccounts).toHaveLength(1);
+      expect(contact.linkedAccounts[0].platform).toBe("twitter");
+      expect(contact.engagementCount).toBe(3);
+      expect(contact.leadScore).toBeDefined();
+    });
+  });
 });
