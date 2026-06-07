@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Guard thinking-model token budget: `max_tokens` only sent when explicitly capped.
 - Correct ≥ 16 GiB Ollama default: `pickGemma4Variant()` returns `gemma4:12b`.
 - Retain rule-firing audit rows on rule deletion: migration `0006` adds `ON DELETE SET NULL`.
+- Misleading "encrypted vault" comments in `src/analytics/mailer.ts` and `src/config/schema.ts` corrected to reference `OPENZIGS_SOCIAL_SMTP_PASSWORD` env var (#167).
+- `EngagementChart` `ResponsiveContainer` now uses explicit `height={288}` — eliminates first-paint `width(-1)/height(-1)` console warning (#168).
+- `CrmRepository.listContacts` N+1 query pattern replaced with three batched `json_each`-expanded statements — query count is now constant regardless of page size (#165).
+- `auto_reply_audit` retention policy: configurable `autoReply.retention` block (default 90-day window + 50 000-row cap) with daily cron prune — prevents unbounded table growth (#163).
 - GDPR cascade toggle in ContactDetailView (#138 AC3).
 - Delete dialog stays open on API error (#138 AC3).
 - REST API CORS headers scoped to configured `server.uiOrigin`.
